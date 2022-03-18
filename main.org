@@ -1,6 +1,25 @@
 #+TITLE: Main file of the phage repo
 #+AUTHOR: Hugo Ávila (@bioinformagica)
-#+PROPERTY: header-args :dir ~/projects/phage-evo-paper :mkdirp yes :exports none
+#+STARTUP: overview
+#+PROPERTY: header-args :dir ~/projects/phage-evo-paper :mkdirp yes :exports none :eval never-export
+
+* ENV
+Env setups
+
+** MAMBA (conda)
+#+BEGIN_SRC shell
+# get conda installer
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+# interactively accept and init the conda executable
+# note: this will change your current shell .rc (.zshrc, .bashrc ...)
+
+# Source the conda changes
+source ~/.bashrc
+
+# Set auto activation of conda base environment to false
+conda config --set auto_activate_base false
+
+#+END_SRC
 
 * Downloading the Snakemake workflow template
 #+NAME: cb:get-snakemake-template
@@ -11,11 +30,10 @@ rm -rf .git
 git init && git commit --allow-empty -m "Initial Commit."
 #+END_SRC
 
-* README.md
-
+* README.md [0/2]
 #+NAME: cb:README.md
 #+CAPTION: README.md
-#+BEGIN_SRC markdown :tangle README.md
+#+BEGIN_SRC markdown 
 # Snakemake workflow: `phage-evo-paper`
 
 [![Snakemake](https://img.shields.io/badge/snakemake-≥6.3.0-brightgreen.svg)](https://snakemake.github.io)
@@ -34,3 +52,7 @@ The usage of this workflow is described in the [Snakemake Workflow Catalog](http
 ,* Replace `pangenome` and `phage-evo-paper` everywhere in the template (also under .github/workflows) with the correct `phage-evo-paper` name and owning user or organization.
 ,* The workflow will occur in the snakemake-workflow-catalog once it has been made public. Then the link under "Usage" will point to the usage instructions if `pangenome` and `phage-evo-paper` were correctly set.
 #+END_SRC
+
+** TODO do templates TODOS
+** TODO add github actions to add snakemake version bedge
+*
