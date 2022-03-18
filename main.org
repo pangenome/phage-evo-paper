@@ -1,17 +1,18 @@
 #+TITLE: Main file of the phage repo
 #+AUTHOR: Hugo Ávila (@bioinformagica)
+#+LANGUAGE: en-us
 #+STARTUP: overview
 #+PROPERTY: header-args :dir ~/projects/phage-evo-paper :mkdirp yes :exports none :eval never-export
 
-* ENV
-Env setups
-
-** MAMBA (conda)
+* ENV setup
+** Snakemake
 #+BEGIN_SRC shell
 # get conda installer
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-# interactively accept and init the conda executable
-# note: this will change your current shell .rc (.zshrc, .bashrc ...)
+
+# Run installer and interactively accept and init the conda executable
+# Atention !!!: this will change your current shell .rc (.zshrc, .bashrc ...)
+bash Miniconda3-latest-Linux-x86_64.sh
 
 # Source the conda changes
 source ~/.bashrc
@@ -19,9 +20,21 @@ source ~/.bashrc
 # Set auto activation of conda base environment to false
 conda config --set auto_activate_base false
 
+# Add channels
+conda config --add channels conda-forge
+conda config --add channels bioconda
+
+# Install mamba
+conda install -n base -c conda-forge mamba -y
+
+# Install Snakemake
+mamba create -c conda-forge -c bioconda -n snakemake snakemake -y
+
 #+END_SRC
 
-* Downloading the Snakemake workflow template
+#+RESULTS:
+
+* Snakemake workflow template
 #+NAME: cb:get-snakemake-template
 #+CAPTION: Clone the Snakemake Template
 #+BEGIN_SRC shell
@@ -30,29 +43,30 @@ rm -rf .git
 git init && git commit --allow-empty -m "Initial Commit."
 #+END_SRC
 
-* README.md [0/2]
+* TODO README.md [0%]
 #+NAME: cb:README.md
 #+CAPTION: README.md
-#+BEGIN_SRC markdown 
+#+BEGIN_SRC markdown :tangle README.md
 # Snakemake workflow: `phage-evo-paper`
 
 [![Snakemake](https://img.shields.io/badge/snakemake-≥6.3.0-brightgreen.svg)](https://snakemake.github.io)
-[![GitHub actions status](https://github.com/pangenome/phage-evo-paper/workflows/Tests/badge.svg?branch=main)](https://github.com/pangenome/phage-evo-paper/actions?query=branch%3Amain+workflow%3ATests)
 
+A Snakemake workflow for `Phage directed evolution analysis`.
+#+END_SR C
 
-A Snakemake workflow for `Phage directed evolution analysis.`
+** TODO Create linter action
+* TODO Snakefile [0%]
+:PROPERTIES:
+:COOKIE_DATA: todo recursive
+:header-args: tangle workflow/Snakefile
+:END:
+#+BEGIN_SRC python
 
-
-## Usage
-
-The usage of this workflow is described in the [Snakemake Workflow Catalog](https://snakemake.github.io/snakemake-workflow-catalog/?usage=pangenome%2Fphage-evo-paper).
-
-# TODO
-
-,* Replace `pangenome` and `phage-evo-paper` everywhere in the template (also under .github/workflows) with the correct `phage-evo-paper` name and owning user or organization.
-,* The workflow will occur in the snakemake-workflow-catalog once it has been made public. Then the link under "Usage" will point to the usage instructions if `pangenome` and `phage-evo-paper` were correctly set.
 #+END_SRC
-
-** TODO do templates TODOS
-** TODO add github actions to add snakemake version bedge
-*
+Minia3 -> GraphAligner (to correct long seqs in the expected phage genome size vs the de bruijn graph) -> pggb (aligning genomes to make a pangenome model)
+** TODO Create Rules [0/5]
+*** TODO Bonito
+*** TODO Minia3
+*** TODO GraphAligner
+*** TODO pggb
+*** TODO odgi
