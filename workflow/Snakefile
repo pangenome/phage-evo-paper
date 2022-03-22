@@ -1,0 +1,12 @@
+# import config file
+configfile: 'config/config.yaml'
+
+rule minia:
+    input:
+        # expand("{data}/{sample}.fastq", data=config['reads'], sample=sample)
+        "{config['reads']}/{sample}.fastq"
+    output:
+        # directory(config['minia_out'])
+        "outputs/{sample}.fastq"
+    shell:
+        "echo {input} {output}"

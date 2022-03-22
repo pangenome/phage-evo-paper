@@ -43,7 +43,7 @@ rm -rf .git
 git init && git commit --allow-empty -m "Initial Commit."
 #+END_SRC
 
-* TODO README.md [0%]
+* TODO README.md [25%]
 #+NAME: cb:README.md
 #+CAPTION: README.md
 #+BEGIN_SRC markdown :tangle README.md
@@ -52,21 +52,58 @@ git init && git commit --allow-empty -m "Initial Commit."
 [![Snakemake](https://img.shields.io/badge/snakemake-≥6.3.0-brightgreen.svg)](https://snakemake.github.io)
 
 A Snakemake workflow for `Phage directed evolution analysis`.
-#+END_SR C
-
+#+END_SRC
+** DONE Create README.md
 ** TODO Create linter action
 * TODO Snakefile [0%]
 :PROPERTIES:
 :COOKIE_DATA: todo recursive
-:header-args: tangle workflow/Snakefile
+:header-args: :tangle workflow/Snakefile :mkdirp yes :exports none :eval never-export
 :END:
-#+BEGIN_SRC python
+** File configs
+#+BEGIN_SRC snakemake
+# import config file
+configfile: 'config/config.yaml'
 
+#+END_SRC
+** ALL
+#+BEGIN_SRC snakemake
+rule all:
+    input:
+        expand("{reads}/")
+#+END_SRC
+** MINIA3
+Genome assembly with [[https:https://github.com/GATB/minia][minia3]]:
+#+BEGIN_SRC snakemake
+rule minia:
+    input:
+        # expand("{data}/{sample}.fastq", data=config['reads'], sample=sample)
+        "{config['reads']}/{sample}.fastq"
+    output:
+        # directory(config['minia_out'])
+        "outputs/{sample}.fastq"
+    shell:
+        "echo {input} {output}"
 #+END_SRC
 Minia3 -> GraphAligner (to correct long seqs in the expected phage genome size vs the de bruijn graph) -> pggb (aligning genomes to make a pangenome model)
 ** TODO Create Rules [0/5]
-*** TODO Bonito
 *** TODO Minia3
 *** TODO GraphAligner
 *** TODO pggb
 *** TODO odgi
+*** TODO Bonito
+* Config
+:PROPERTIES:
+:COOKIE_DATA: todo recursive
+:header-args: :tangle config/config.yaml :mkdirp yes :exports none :eval never-export
+:END:
+** main file
+#+BEGIN_SRC yaml
+data: 'data'
+
+# Input
+reads: 'data/fastq'
+
+# Outputs
+minia_out: 'outputs/minia_out'
+#+END_SRC

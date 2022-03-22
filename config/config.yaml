@@ -1,0 +1,7 @@
+data: 'data'
+
+# Input
+reads: 'data/fastq'
+
+# Outputs
+minia_out: 'outputs/minia_out'
