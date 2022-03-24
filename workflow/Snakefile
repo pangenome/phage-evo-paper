@@ -1,12 +1,39 @@
-# import config file
+import os
+import sys
+
 configfile: 'config/config.yaml'
+
+SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))[:3]
+
+rule all:
+    input:
+        nanoplot_dir=config['nanoplot_out']
+
+rule nanoplot:
+    input:
+        expand(config['reads']+"/{samples}.fastq", samples=SAMPLES)
+    output:
+        directory(config['nanoplot_out'])
+    conda:
+        "envs/nanoplot_env.yaml"
+    threads:
+        2/3
+    shell:
+        """
+        NanoPlot \
+            -t {threads} \
+            --plots dot \
+            --legacy hex \
+            --output {output} \
+            --fastq {input}
+        """
 
 rule minia:
     input:
-        # expand("{data}/{sample}.fastq", data=config['reads'], sample=sample)
-        "{config['reads']}/{sample}.fastq"
+        expand("{reads_dir}/{sample}.fastq", reads_dir=config['reads'], sample=SAMPLES)
     output:
-        # directory(config['minia_out'])
-        "outputs/{sample}.fastq"
-    shell:
-        "echo {input} {output}"
+        'results.txt'
+    params:
+        cmd="echo"
+    run:
+        shell("{params.cmd} {input} >> {output}")
