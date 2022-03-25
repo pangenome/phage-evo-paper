@@ -6,3 +6,6 @@ reads: 'data/fastq'
 # Outputs
 minia_out: 'outputs/minia'
 nanoplot_out: 'outputs/nanoplot'
+
+# parameters
+kmers: [21,33,55,77,99,127]

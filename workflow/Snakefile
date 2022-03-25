@@ -3,37 +3,45 @@ import sys
 
 configfile: 'config/config.yaml'
 
-SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))[:3]
+SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
 
 rule all:
     input:
-        nanoplot_dir=config['nanoplot_out']
+        # Nano plot
+        nanoplot_out=config['nanoplot_out'],
+
+        # Minia
+        reads=expand( config['reads']+"/{sample}.fastq", sample=SAMPLES),
+        minia_assemblies=expand(config['minia_out']+"/K{kmer}.fasta", kmer=config['kmers']),
 
 rule nanoplot:
+    conda:
+        "envs/nanoplot_env.yaml"
     input:
         expand(config['reads']+"/{samples}.fastq", samples=SAMPLES)
     output:
         directory(config['nanoplot_out'])
-    conda:
-        "envs/nanoplot_env.yaml"
     threads:
-        2/3
+        workflow.cores
     shell:
         """
-        NanoPlot \
-            -t {threads} \
-            --plots dot \
-            --legacy hex \
-            --output {output} \
-            --fastq {input}
+        mkdir -p {output}
+        NanoPlot -t {threads} --plots dot --output {output} --fastq {input}
         """
 
 rule minia:
+    conda:
+        'envs/minia_env.yaml'
     input:
-        expand("{reads_dir}/{sample}.fastq", reads_dir=config['reads'], sample=SAMPLES)
-    output:
-        'results.txt'
+        reads=expand(config['reads']+"/{samples}.fastq", samples=SAMPLES)
     params:
-        cmd="echo"
-    run:
-        shell("{params.cmd} {input} >> {output}")
+        kmer="{kmer}",
+        in_arg= lambda wildcards, input: '-in '+' -in '.join(input.reads)
+    threads:
+        lambda cores: max(1, workflow.cores * 0.2)
+    output:
+        minia_assemblies=config['minia_out']+"/K{kmer}.fasta"
+    shell:
+        """
+        minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min 10 -out {output.minia_assemblies} {params.in_arg}
+        """

@@ -1,0 +1,15 @@
+name: minia_env
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1=conda_forge
+  - _openmp_mutex=4.5=1_gnu
+  - libgcc-ng=11.2.0=h1d223b6_14
+  - libgomp=11.2.0=h1d223b6_14
+  - libstdcxx-ng=11.2.0=he4da1e4_14
+  - libzlib=1.2.11=h36c2ea0_1013
+  - minia=3.2.6=hd03093a_1
+  - zlib=1.2.11=h36c2ea0_1013
+prefix: /home/hugo/miniconda3/envs/minia_env
