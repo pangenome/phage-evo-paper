@@ -55,7 +55,7 @@ A Snakemake workflow for `Phage directed evolution analysis`.
 #+END_SRC
 ** DONE Create README.md
 ** TODO Create linter action
-* TODO Snakefile [28%]
+* TODO Snakefile [25%]
 :PROPERTIES:
 :COOKIE_DATA: todo recursive
 :header-args: :tangle workflow/Snakefile :mkdirp yes :exports none :eval never-export
@@ -84,9 +84,30 @@ rule all:
         # Nano plot
         nanoplot_out=config['nanoplot_out'],
 
+        # kmergenie
+        kmergenie_out=config['kmergenie_out'],
+        best_kmer=config['kmergenie_out']+"/best_kmer.out",
+
         # Minia
         reads=expand( config['reads']+"/{sample}.fastq", sample=SAMPLES),
         minia_assemblies=expand(config['minia_out']+"/K{kmer}.fasta", kmer=config['kmers']),
+#+END_SRC
+*** KmerGenie
+Pick the best (Kgenie best) K-mer size.
+#+BEGIN_SRC snakemake
+rule kmergenie:
+    conda:
+        "envs/kmergenie_env.yaml"
+    threads:
+        workflow.cores
+    input:
+        expand(config['reads']+"/{samples}.fastq", samples=SAMPLES)
+    output:
+        kmergenie_out=directory(config['kmergenie_out']),
+        best_kmer=config['kmergenie_out']+"/best_kmer.out"
+    shell:
+        "kmergenie {input} -t {threads} -o {output.kmergenie_out}/ > {output.best_kmer}"
+
 #+END_SRC
 
 *** NANOPLOT
@@ -128,7 +149,8 @@ rule minia:
         """
 #+END_SRC
 
-** TODO Create Rules [2/6]
+** TODO Create Rules [2/7]
+*** TODO KmerGenie
 *** DONE Nanoplot
 *** DONE Minia3
 *** TODO GraphAligner
@@ -150,9 +172,11 @@ reads: 'data/fastq'
 # Outputs
 minia_out: 'outputs/minia'
 nanoplot_out: 'outputs/nanoplot'
+kmergenie_out: 'outputs/kmergenie'
 
 # parameters
 kmers: [21,33,55,77,99,127]
+largest_kmer: 250
 #+END_SRC
 * ENVS
 :PROPERTIES:

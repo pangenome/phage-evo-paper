@@ -10,9 +10,26 @@ rule all:
         # Nano plot
         nanoplot_out=config['nanoplot_out'],
 
+        # kmergenie
+        kmergenie_out=config['kmergenie_out'],
+        best_kmer=config['kmergenie_out']+"/best_kmer.out",
+
         # Minia
         reads=expand( config['reads']+"/{sample}.fastq", sample=SAMPLES),
         minia_assemblies=expand(config['minia_out']+"/K{kmer}.fasta", kmer=config['kmers']),
+
+rule kmergenie:
+    conda:
+        "envs/kmergenie_env.yaml"
+    threads:
+        workflow.cores
+    input:
+        expand(config['reads']+"/{samples}.fastq", samples=SAMPLES)
+    output:
+        kmergenie_out=directory(config['kmergenie_out']),
+        best_kmer=config['kmergenie_out']+"/best_kmer.out"
+    shell:
+        "kmergenie {input} -t {threads} -o {output.kmergenie_out}/ > {output.best_kmer}"
 
 rule nanoplot:
     conda:
