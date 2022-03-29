@@ -190,6 +190,7 @@ largest_kmer: 250
 declare -a envs=(
     "nanoplot_env"
     "minia_env"
+    "kmergenie_env"
 )
 
 envs_dir="workflow/envs"
@@ -207,6 +208,7 @@ ls -v1 "${envs_dir}/"*yaml |
 
 #+RESULTS: get-env-yaml
 #+begin_src org
+DONE: workflow/envs/kmergenie_env.yaml
 DONE: workflow/envs/minia_env.yaml
 DONE: workflow/envs/nanoplot_env.yaml
 #+end_src
