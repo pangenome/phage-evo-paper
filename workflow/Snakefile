@@ -7,29 +7,12 @@ SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter
 
 rule all:
     input:
-        # Nano plot
+        # Nanoplot
         nanoplot_out=config['nanoplot_out'],
-
-        # kmergenie
-        kmergenie_out=config['kmergenie_out'],
-        best_kmer=config['kmergenie_out']+"/best_kmer.out",
-
-        # Minia
         reads=expand( config['reads']+"/{sample}.fastq", sample=SAMPLES),
-        minia_assemblies=expand(config['minia_out']+"/K{kmer}.fasta", kmer=config['kmers']),
 
-rule kmergenie:
-    conda:
-        "envs/kmergenie_env.yaml"
-    threads:
-        workflow.cores
-    input:
-        expand(config['reads']+"/{samples}.fastq", samples=SAMPLES)
-    output:
-        kmergenie_out=directory(config['kmergenie_out']),
-        best_kmer=config['kmergenie_out']+"/best_kmer.out"
-    shell:
-        "kmergenie {input} -t {threads} -o {output.kmergenie_out}/ > {output.best_kmer}"
+        # Vechat
+        vechat_fasta=config['vechat_out']+"/all.passages.reads.corrected.fa"
 
 rule nanoplot:
     conda:
@@ -46,19 +29,31 @@ rule nanoplot:
         NanoPlot -t {threads} --plots dot --output {output} --fastq {input}
         """
 
-rule minia:
-    conda:
-        'envs/minia_env.yaml'
+rule error_correction:
     input:
-        reads=expand(config['reads']+"/{samples}.fastq", samples=SAMPLES)
-    params:
-        kmer="{kmer}",
-        in_arg= lambda wildcards, input: '-in '+' -in '.join(input.reads)
-    threads:
-        lambda cores: max(1, workflow.cores * 0.2)
+        reads=expand( config['reads']+"/{sample}.fastq", sample=SAMPLES),
     output:
-        minia_assemblies=config['minia_out']+"/K{kmer}.fasta"
+        vechat_fasta=config['vechat_out']+"/all.passages.reads.corrected.fa"
+    threads:
+        workflow.cores
+    conda:
+        'envs/vechat_env.yaml'
     shell:
-        """
-        minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min 10 -out {output.minia_assemblies} {params.in_arg}
-        """
+        "vechat {input.reads} -t {threads} --platform ont -o {output.vechat_fasta}"
+
+# rule minia:
+#     conda:
+#         'envs/minia_env.yaml'
+#     input:
+#         reads=expand(config['reads']+"/{samples}.fastq", samples=SAMPLES)
+#     params:
+#         kmer="{kmer}",
+#         in_arg= lambda wildcards, input: '-in '+' -in '.join(input.reads)
+#     threads:
+#         lambda cores: max(1, workflow.cores * 0.2)
+#     output:
+#         minia_assemblies=config['minia_out']+"/K{kmer}.fasta"
+#     shell:
+#         """
+#         minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min 10 -out {output.minia_assemblies} {params.in_arg}
+#         """
