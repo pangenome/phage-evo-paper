@@ -81,14 +81,22 @@ SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter
 #+BEGIN_SRC snakemake
 rule all:
     input:
-        # Nanoplot
+        merged_reads=config['data']+'/all.reads.fastq',
         nanoplot_out=config['nanoplot_out'],
-        reads=expand( config['reads']+"/{sample}.fastq", sample=SAMPLES),
-
-        # Vechat
         vechat_fasta=config['vechat_out']+"/all.passages.reads.corrected.fa"
 
 #+END_SRC
+*** Merge reads
+#+BEGIN_SRC snakemake
+rule merged_reads:
+    input:
+        reads=expand( config['reads']+"/{sample}.fastq", sample=SAMPLES)
+    output:
+        merged_reads=config['data']+'/all.reads.fastq',
+    shell:
+        "cat {input.reads} > {output.merged_reads}"
+#+END_SRC
+
 *** NANOPLOT
 Get some quality check data (mostly read length distribution):
 #+BEGIN_SRC snakemake
@@ -96,15 +104,15 @@ rule nanoplot:
     conda:
         "envs/nanoplot_env.yaml"
     input:
-        expand(config['reads']+"/{samples}.fastq", samples=SAMPLES)
+        merged_reads=config['data']+'/all.reads.fastq',
     output:
-        directory(config['nanoplot_out'])
+        nanoplot_out=directory(config['nanoplot_out'])
     threads:
         workflow.cores
     shell:
         """
         mkdir -p {output}
-        NanoPlot -t {threads} --plots dot --output {output} --fastq {input}
+        NanoPlot -t {threads} --plots dot --output {output.nanoplot_out} --fastq {input.merged_reads}
         """
 #+END_SRC
 
@@ -113,7 +121,7 @@ First let's do some error correction on the reads.
 #+BEGIN_SRC snakemake
 rule error_correction:
     input:
-        reads=expand( config['reads']+"/{sample}.fastq", sample=SAMPLES),
+        merged_reads=config['data']+'/all.reads.fastq',
     output:
         vechat_fasta=config['vechat_out']+"/all.passages.reads.corrected.fa"
     threads:
@@ -121,7 +129,7 @@ rule error_correction:
     conda:
         'envs/vechat_env.yaml'
     shell:
-        "vechat {input.reads} -t {threads} --platform ont -o {output.vechat_fasta}"
+        "vechat {input.merged_reads} -t {threads} --platform ont -o {output.vechat_fasta}"
 
 #+END_SRC
 *** MINIMA3

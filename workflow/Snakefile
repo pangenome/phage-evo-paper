@@ -7,31 +7,36 @@ SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter
 
 rule all:
     input:
-        # Nanoplot
+        merged_reads=config['data']+'/all.reads.fastq',
         nanoplot_out=config['nanoplot_out'],
-        reads=expand( config['reads']+"/{sample}.fastq", sample=SAMPLES),
-
-        # Vechat
         vechat_fasta=config['vechat_out']+"/all.passages.reads.corrected.fa"
+
+rule merged_reads:
+    input:
+        reads=expand( config['reads']+"/{sample}.fastq", sample=SAMPLES)
+    output:
+        merged_reads=config['data']+'/all.reads.fastq',
+    shell:
+        "cat {input.reads} > {output.merged_reads}"
 
 rule nanoplot:
     conda:
         "envs/nanoplot_env.yaml"
     input:
-        expand(config['reads']+"/{samples}.fastq", samples=SAMPLES)
+        merged_reads=config['data']+'/all.reads.fastq',
     output:
-        directory(config['nanoplot_out'])
+        nanoplot_out=directory(config['nanoplot_out'])
     threads:
         workflow.cores
     shell:
         """
         mkdir -p {output}
-        NanoPlot -t {threads} --plots dot --output {output} --fastq {input}
+        NanoPlot -t {threads} --plots dot --output {output.nanoplot_out} --fastq {input.merged_reads}
         """
 
 rule error_correction:
     input:
-        reads=expand( config['reads']+"/{sample}.fastq", sample=SAMPLES),
+        merged_reads=config['data']+'/all.reads.fastq',
     output:
         vechat_fasta=config['vechat_out']+"/all.passages.reads.corrected.fa"
     threads:
@@ -39,7 +44,7 @@ rule error_correction:
     conda:
         'envs/vechat_env.yaml'
     shell:
-        "vechat {input.reads} -t {threads} --platform ont -o {output.vechat_fasta}"
+        "vechat {input.merged_reads} -t {threads} --platform ont -o {output.vechat_fasta}"
 
 # rule minia:
 #     conda:
