@@ -9,7 +9,8 @@ rule all:
     input:
         merged_reads=config['data']+'/all.reads.fastq',
         nanoplot_out=config['nanoplot_out'],
-        vechat_fasta=config['vechat_out']+"/all.passages.reads.corrected.fa"
+        miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa"
+        # minia_assemby="outputs/assemblies/minia/minia.k{params.kmer}.fasta",
 
 rule merged_reads:
     input:
@@ -29,36 +30,31 @@ rule nanoplot:
     threads:
         workflow.cores
     shell:
-        """
-        mkdir -p {output}
-        NanoPlot -t {threads} --plots dot --output {output.nanoplot_out} --fastq {input.merged_reads}
-        """
-
-rule error_correction:
-    input:
-        merged_reads=config['data']+'/all.reads.fastq',
-    output:
-        vechat_fasta=config['vechat_out']+"/all.passages.reads.corrected.fa"
-    threads:
-        workflow.cores
-    conda:
-        'envs/vechat_env.yaml'
-    shell:
-        "vechat {input.merged_reads} -t {threads} --platform ont -o {output.vechat_fasta}"
+        "NanoPlot -t {threads} --plots dot -o {output.nanoplot_out} --fastq {input.merged_reads}"
 
 # rule minia:
 #     conda:
 #         'envs/minia_env.yaml'
 #     input:
-#         reads=expand(config['reads']+"/{samples}.fastq", samples=SAMPLES)
+#         merged_reads=config['data']+'/all.reads.fastq',
 #     params:
-#         kmer="{kmer}",
-#         in_arg= lambda wildcards, input: '-in '+' -in '.join(input.reads)
+#         kmer=21,
+#         abundance=3,
 #     threads:
-#         lambda cores: max(1, workflow.cores * 0.2)
+#         workflow.cores
 #     output:
-#         minia_assemblies=config['minia_out']+"/K{kmer}.fasta"
+#         minia_assemblie=config['minia_out']+"/minia.k{params.kmer}.fasta"
 #     shell:
-#         """
-#         minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min 10 -out {output.minia_assemblies} {params.in_arg}
-#         """
+#         "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out {output.minia_assemblie} -in {input.merged_reads}"
+
+rule miniasm_assembly:
+    input:
+        merged_reads=config['data']+'/all.reads.fastq'
+    output:
+        miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa"
+    conda:
+        'envs/miniasm_env.yaml'
+    threads:
+        workflow.cores
+    shell:
+        "miniasm_and_minipolish.sh {input.merged_reads} {threads} > {output.miniasm_assembly}"
