@@ -9,7 +9,8 @@ rule all:
     input:
         merged_reads=config['data']+'/all.reads.fastq',
         nanoplot_out=config['nanoplot_out'],
-        miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa"
+        reads=expand(config['reads']+'/{sample}.fastq', sample=SAMPLES),
+        miniasm_assembly=expand("outputs/assemblies/miniasm/{sample}.polished.gfa", sample=SAMPLES)
         # minia_assemby="outputs/assemblies/minia/minia.k{params.kmer}.fasta",
 
 rule merged_reads:
@@ -49,12 +50,12 @@ rule nanoplot:
 
 rule miniasm_assembly:
     input:
-        merged_reads=config['data']+'/all.reads.fastq'
+        config['reads']+'/{sample}.fastq'
     output:
-        miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa"
+        "outputs/assemblies/miniasm/{sample}.polished.gfa"
     conda:
         'envs/miniasm_env.yaml'
     threads:
         workflow.cores
     shell:
-        "miniasm_and_minipolish.sh {input.merged_reads} {threads} > {output.miniasm_assembly}"
+        "miniasm_and_minipolish.sh {input} {threads} > {output}"
