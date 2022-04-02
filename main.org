@@ -64,6 +64,7 @@ A Snakemake workflow for `Phage directed evolution analysis`.
 #+BEGIN_SRC snakemake
 import os
 import sys
+from operator import itemgetter as itget
 #+END_SRC
 
 ** FILE CONFIGS
@@ -71,8 +72,13 @@ import sys
 configfile: 'config/config.yaml'
 #+END_SRC
 
+** FUNCTIONS
+#+BEGIN_SRC snakemake
+get_cores_perc = lambda core: max(1, workflow.cores)
+#+END_SRC
 ** GLOBAL VARIABLES
 #+BEGIN_SRC snakemake
+output_dirs = config['outputs']
 SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
 #+END_SRC
 
@@ -81,72 +87,85 @@ SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter
 #+BEGIN_SRC snakemake
 rule all:
     input:
-        merged_reads=config['data']+'/all.reads.fastq',
-        nanoplot_out=config['nanoplot_out'],
-        reads=expand(config['reads']+'/{sample}.fastq', sample=SAMPLES),
-        miniasm_assembly=expand("outputs/assemblies/miniasm/{sample}.polished.gfa", sample=SAMPLES)
-        # minia_assemby="outputs/assemblies/minia/minia.k{params.kmer}.fasta",
+        reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
+        nanoplot_out=expand(itget('before','after')(output_dirs['nanoplot'])),
+        minia_assembly="outputs/assemblies/minia/minia.k21.a7.contigs.fa",
+        miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa"
 #+END_SRC
 *** Merge reads
 #+BEGIN_SRC snakemake
 rule merged_reads:
     input:
-        reads=expand( config['reads']+"/{sample}.fastq", sample=SAMPLES)
+        expand(config['reads']+'/{sample}.fastq', sample=SAMPLES)
     output:
-        merged_reads=config['data']+'/all.reads.fastq',
+        config['data']+'/merged.before.filtering.fastq'
     shell:
-        "cat {input.reads} > {output.merged_reads}"
+        "cat {input} > {output}"
 #+END_SRC
 
 *** NANOPLOT
 Get some quality check data (mostly read length distribution):
 #+BEGIN_SRC snakemake
 rule nanoplot:
-    conda:
-        "envs/nanoplot_env.yaml"
     input:
-        merged_reads=config['data']+'/all.reads.fastq',
+        # reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
+        config['data']+"/merged.{status}.filtering.fastq"
     output:
-        nanoplot_out=directory(config['nanoplot_out'])
+        "outputs/nanoplot/{status}_filter"
     threads:
         workflow.cores
+    conda:
+        "envs/nanoplot_env.yaml"
     shell:
-        "NanoPlot -t {threads} --plots dot -o {output.nanoplot_out} --fastq {input.merged_reads}"
+        "NanoPlot -t {threads} --plots dot -o {output} --fastq {input}"
+#+END_SRC
+
+*** FILTER READS
+#+BEGIN_SRC snakemake
+rule filter_reads:
+    input:
+        config['data']+'/merged.before.filtering.fastq'
+    output:
+        config['data']+'/merged.after.filtering.fastq'
+    params:
+        ,**config['params']['filtlong']
+    conda:
+        "envs/filtlong_env.yaml"
+    shell:
+        "filtlong --min_length {params.min_length} --keep_percent {params.keep_percent} {input} > {output} "
 #+END_SRC
 
 *** MINIA3
 Genome assembly with [[https:https://github.com/GATB/minia][minia3]]:
-#+BEGIN_SRC snakemake :exports none
-# rule minia:
-#     conda:
-#         'envs/minia_env.yaml'
-#     input:
-#         merged_reads=config['data']+'/all.reads.fastq',
-#     params:
-#         kmer=21,
-#         abundance=3,
-#     threads:
-#         workflow.cores
-#     output:
-#         minia_assemblie=config['minia_out']+"/minia.k{params.kmer}.fasta"
-#     shell:
-#         "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out {output.minia_assemblie} -in {input.merged_reads}"
+#+BEGIN_SRC snakemake
+rule minia:
+    input:
+        config['data']+'/merged.after.filtering.fastq'
+    output:
+        minia_assembly="outputs/assemblies/minia/minia.k21.a7.contigs.fa"
+    params:
+        ,**config['params']['minia']
+    threads:
+        get_cores_perc(0.5)
+    conda:
+        'envs/minia_env.yaml'
+    shell:
+        "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out outputs/assemblies/minia/minia.k21.a7 -in {input}"
 #+END_SRC
 
 *** MINIASM
 #+BEGIN_SRC snakemake
 rule miniasm_assembly:
     input:
-        config['reads']+'/{sample}.fastq'
+        config['data']+'/merged.after.filtering.fastq'
     output:
-        "outputs/assemblies/miniasm/{sample}.polished.gfa"
+        miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa"
     conda:
         'envs/miniasm_env.yaml'
     threads:
-        workflow.cores
+        get_cores_perc(0.5)
     shell:
-        "miniasm_and_minipolish.sh {input} {threads} > {output}"
-
+        "miniasm_and_minipolish.sh {input} {threads} > {output.miniasm_assembly}"
 #+END_SRC
 
 ** TODO Create Rules [1/7]
@@ -170,14 +189,28 @@ data: 'data'
 reads: 'data/fastq'
 
 # Outputs
-minia_out: 'outputs/minia'
-nanoplot_out: 'outputs/nanoplot'
-kmergenie_out: 'outputs/kmergenie'
-vechat_out: 'outputs/vechat'
+outputs:
+  nanoplot:
+    before:
+      'outputs/nanoplot/before_filter'
+    after:
+      'outputs/nanoplot/after_filter'
 
-# parameters
-kmers: [21,33,55,77,99,127]
-largest_kmer: 250
+assemblies:
+  minia: 'outputs/assemblies/minia'
+  miniasm: 'outputs/assemblies/miniasm'
+
+# PARAMETERS
+
+# minia
+params:
+  minia:
+    kmer: 21
+    abundance: 10
+  filtlong:
+    min_length: 1000
+    keep_percent: 95
+
 #+END_SRC
 * ENVS
 :PROPERTIES:

@@ -4,11 +4,24 @@ data: 'data'
 reads: 'data/fastq'
 
 # Outputs
-minia_out: 'outputs/minia'
-nanoplot_out: 'outputs/nanoplot'
-kmergenie_out: 'outputs/kmergenie'
-vechat_out: 'outputs/vechat'
+outputs:
+  nanoplot:
+    before:
+      'outputs/nanoplot/before_filter'
+    after:
+      'outputs/nanoplot/after_filter'
 
-# parameters
-kmers: [21,33,55,77,99,127]
-largest_kmer: 250
+assemblies:
+  minia: 'outputs/assemblies/minia'
+  miniasm: 'outputs/assemblies/miniasm'
+
+# PARAMETERS
+
+# minia
+params:
+  minia:
+    kmer: 21
+    abundance: 10
+  filtlong:
+    min_length: 1000
+    keep_percent: 95

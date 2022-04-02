@@ -1,61 +1,76 @@
 import os
 import sys
+from operator import itemgetter as itget
 
 configfile: 'config/config.yaml'
 
+get_cores_perc = lambda core: max(1, workflow.cores)
+
+output_dirs = config['outputs']
 SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
 
 rule all:
     input:
-        merged_reads=config['data']+'/all.reads.fastq',
-        nanoplot_out=config['nanoplot_out'],
-        reads=expand(config['reads']+'/{sample}.fastq', sample=SAMPLES),
-        miniasm_assembly=expand("outputs/assemblies/miniasm/{sample}.polished.gfa", sample=SAMPLES)
-        # minia_assemby="outputs/assemblies/minia/minia.k{params.kmer}.fasta",
+        reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
+        nanoplot_out=expand(itget('before','after')(output_dirs['nanoplot'])),
+        minia_assembly="outputs/assemblies/minia/minia.k21.a7.contigs.fa",
+        miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa"
 
 rule merged_reads:
     input:
-        reads=expand( config['reads']+"/{sample}.fastq", sample=SAMPLES)
+        expand(config['reads']+'/{sample}.fastq', sample=SAMPLES)
     output:
-        merged_reads=config['data']+'/all.reads.fastq',
+        config['data']+'/merged.before.filtering.fastq'
     shell:
-        "cat {input.reads} > {output.merged_reads}"
+        "cat {input} > {output}"
 
 rule nanoplot:
-    conda:
-        "envs/nanoplot_env.yaml"
     input:
-        merged_reads=config['data']+'/all.reads.fastq',
+        # reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
+        config['data']+"/merged.{status}.filtering.fastq"
     output:
-        nanoplot_out=directory(config['nanoplot_out'])
+        "outputs/nanoplot/{status}_filter"
     threads:
         workflow.cores
+    conda:
+        "envs/nanoplot_env.yaml"
     shell:
-        "NanoPlot -t {threads} --plots dot -o {output.nanoplot_out} --fastq {input.merged_reads}"
+        "NanoPlot -t {threads} --plots dot -o {output} --fastq {input}"
 
-# rule minia:
-#     conda:
-#         'envs/minia_env.yaml'
-#     input:
-#         merged_reads=config['data']+'/all.reads.fastq',
-#     params:
-#         kmer=21,
-#         abundance=3,
-#     threads:
-#         workflow.cores
-#     output:
-#         minia_assemblie=config['minia_out']+"/minia.k{params.kmer}.fasta"
-#     shell:
-#         "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out {output.minia_assemblie} -in {input.merged_reads}"
+rule filter_reads:
+    input:
+        config['data']+'/merged.before.filtering.fastq'
+    output:
+        config['data']+'/merged.after.filtering.fastq'
+    params:
+        **config['params']['filtlong']
+    conda:
+        "envs/filtlong_env.yaml"
+    shell:
+        "filtlong --min_length {params.min_length} --keep_percent {params.keep_percent} {input} > {output} "
+
+rule minia:
+    input:
+        config['data']+'/merged.after.filtering.fastq'
+    output:
+        minia_assembly="outputs/assemblies/minia/minia.k21.a7.contigs.fa"
+    params:
+        **config['params']['minia']
+    threads:
+        get_cores_perc(0.5)
+    conda:
+        'envs/minia_env.yaml'
+    shell:
+        "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out outputs/assemblies/minia/minia.k21.a7 -in {input}"
 
 rule miniasm_assembly:
     input:
-        config['reads']+'/{sample}.fastq'
+        config['data']+'/merged.after.filtering.fastq'
     output:
-        "outputs/assemblies/miniasm/{sample}.polished.gfa"
+        miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa"
     conda:
         'envs/miniasm_env.yaml'
     threads:
-        workflow.cores
+        get_cores_perc(0.5)
     shell:
-        "miniasm_and_minipolish.sh {input} {threads} > {output}"
+        "miniasm_and_minipolish.sh {input} {threads} > {output.miniasm_assembly}"
