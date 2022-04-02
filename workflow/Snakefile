@@ -4,7 +4,7 @@ from operator import itemgetter as itget
 
 configfile: 'config/config.yaml'
 
-get_cores_perc = lambda core: max(1, workflow.cores)
+get_cores_perc = lambda perc: max(1, workflow.cores * perc)
 
 output_dirs = config['outputs']
 SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
@@ -29,9 +29,9 @@ rule nanoplot:
         # reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
         config['data']+"/merged.{status}.filtering.fastq"
     output:
-        "outputs/nanoplot/{status}_filter"
+        directory("outputs/nanoplot/{status}_filter")
     threads:
-        workflow.cores
+        get_cores_perc(0.5)
     conda:
         "envs/nanoplot_env.yaml"
     shell:
