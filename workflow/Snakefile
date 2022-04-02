@@ -14,7 +14,8 @@ rule all:
         reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
         nanoplot_out=expand(itget('before','after')(output_dirs['nanoplot'])),
         minia_assembly="outputs/assemblies/minia/minia.k21.a7.contigs.fa",
-        miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa"
+        miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa",
+        minia_assembly_gfa="outputs/assemblies/minia/minia.k21.a7.contigs.gfa"
 
 rule merged_reads:
     input:
@@ -63,14 +64,19 @@ rule minia:
     shell:
         "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out outputs/assemblies/minia/minia.k21.a7 -in {input}"
 
-rule miniasm_assembly:
+		
+rule minia_fasta_to_gfa:
     input:
-        config['data']+'/merged.after.filtering.fastq'
+        minia_assembly="outputs/assemblies/minia/minia.k21.a7.contigs.fa",
+	script=os.path.join(os.path.dirname(workflow.snakefile),'scripts', 'convertToGFA.py')
     output:
-        miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa"
+        minia_assembly_gfa="outputs/assemblies/minia/minia.k21.a7.contigs.gfa"
+    params:
+        **config['params']['minia']
     conda:
-        'envs/miniasm_env.yaml'
-    threads:
-        get_cores_perc(0.5)
+        'envs/minia_env.yaml'
     shell:
-        "miniasm_and_minipolish.sh {input} {threads} > {output.miniasm_assembly}"
+        "python {input.script} {input.minia_assembly} {output.minia_assembly_gfa} {params.kmer}"
+
+
+
