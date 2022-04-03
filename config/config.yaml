@@ -10,10 +10,9 @@ outputs:
       'outputs/nanoplot/before_filter'
     after:
       'outputs/nanoplot/after_filter'
-
-assemblies:
-  minia: 'outputs/assemblies/minia'
-  miniasm: 'outputs/assemblies/miniasm'
+  assemblies:
+    minia: 'outputs/assemblies/minia'
+    miniasm: 'outputs/assemblies/miniasm'
 
 # PARAMETERS
 

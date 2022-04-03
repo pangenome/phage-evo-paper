@@ -1,22 +1,35 @@
+# [[file:../main.org::*IMPORTS][IMPORTS:1]]
 import os
 import sys
 from operator import itemgetter as itget
+# IMPORTS:1 ends here
 
+# [[file:../main.org::*FILE CONFIGS][FILE CONFIGS:1]]
 configfile: 'config/config.yaml'
+# FILE CONFIGS:1 ends here
 
+# [[file:../main.org::*FUNCTIONS][FUNCTIONS:1]]
 get_cores_perc = lambda perc: max(1, workflow.cores * perc)
+join_path = lambda *args: os.path.join(*args)
+# FUNCTIONS:1 ends here
 
+# [[file:../main.org::*GLOBAL VARIABLES][GLOBAL VARIABLES:1]]
+snakefile_path = os.path.dirname(workflow.snakefile)
 output_dirs = config['outputs']
 SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
+# GLOBAL VARIABLES:1 ends here
 
+# [[file:../main.org::*ALL][ALL:1]]
 rule all:
     input:
         reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
         nanoplot_out=expand(itget('before','after')(output_dirs['nanoplot'])),
-        minia_assembly="outputs/assemblies/minia/minia.k21.a7.contigs.fa",
-        miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa",
-        minia_assembly_gfa="outputs/assemblies/minia/minia.k21.a7.contigs.gfa"
+        miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gfa"),
+        miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.gfa")
+        # miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa",
+# ALL:1 ends here
 
+# [[file:../main.org::*Merge reads][Merge reads:1]]
 rule merged_reads:
     input:
         expand(config['reads']+'/{sample}.fastq', sample=SAMPLES)
@@ -24,10 +37,11 @@ rule merged_reads:
         config['data']+'/merged.before.filtering.fastq'
     shell:
         "cat {input} > {output}"
+# Merge reads:1 ends here
 
+# [[file:../main.org::*NANOPLOT][NANOPLOT:1]]
 rule nanoplot:
     input:
-        # reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
         config['data']+"/merged.{status}.filtering.fastq"
     output:
         directory("outputs/nanoplot/{status}_filter")
@@ -37,46 +51,108 @@ rule nanoplot:
         "envs/nanoplot_env.yaml"
     shell:
         "NanoPlot -t {threads} --plots dot -o {output} --fastq {input}"
+# NANOPLOT:1 ends here
 
+# [[file:../main.org::*FILTER READS][FILTER READS:1]]
 rule filter_reads:
     input:
         config['data']+'/merged.before.filtering.fastq'
     output:
         config['data']+'/merged.after.filtering.fastq'
     params:
-        **config['params']['filtlong']
+        min_length = 20_000,
+        keep_percent = 100
     conda:
         "envs/filtlong_env.yaml"
     shell:
         "filtlong --min_length {params.min_length} --keep_percent {params.keep_percent} {input} > {output} "
+# FILTER READS:1 ends here
 
-rule minia:
+# [[file:../main.org::*MINIA3][MINIA3:1]]
+# rule minia:
+#     input:
+#         config['data']+'/merged.after.filtering.fastq'
+#     output:
+#         minia_assembly="outputs/assemblies/minia/minia.k21.a7.contigs.fa"
+#     params:
+#         **config['params']['minia']
+#     threads:
+#         get_cores_perc(0.5)
+#     conda:
+#         'envs/minia_env.yaml'
+#     shell:
+#         "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out outputs/assemblies/minia/minia.k21.a7 -in {input}"
+# MINIA3:1 ends here
+
+# [[file:../main.org::*FASTA_TO_GFA][FASTA_TO_GFA:1]]
+# rule minia_fasta_to_gfa:
+#     input:
+#         minia_assembly="outputs/assemblies/minia/minia.k21.a7.contigs.fa",
+# 	script=os.path.join(os.path.dirname(workflow.snakefile),'scripts', 'convertToGFA.py')
+#     output:
+#         minia_assembly_gfa="outputs/assemblies/minia/minia.k21.a7.contigs.gfa"
+#     params:
+#         **config['params']['minia']
+#     conda:
+#         'envs/minia_env.yaml'
+#     shell:
+#         "python {input.script} {input.minia_assembly} {output.minia_assembly_gfa} {params.kmer}"
+# FASTA_TO_GFA:1 ends here
+
+# [[file:../main.org::*MINIMAP][MINIMAP:1]]
+rule overlap_filtered_reads:
     input:
-        config['data']+'/merged.after.filtering.fastq'
+        filtlong_reads = config['data']+'/merged.after.filtering.fastq'
     output:
-        minia_assembly="outputs/assemblies/minia/minia.k21.a7.contigs.fa"
-    params:
-        **config['params']['minia']
+        overlaped_reads = join_path(config['outputs']['assemblies']['miniasm'], "overlap.20Kb.paf")
+    threads:
+        get_cores_perc(1)
+    shell:
+        "minimap2 -x ava-ont -t {threads} {input.filtlong_reads} {input.filtlong_reads} > {output.overlaped_reads}"
+# MINIMAP:1 ends here
+
+# [[file:../main.org::*MINIASM][MINIASM:1]]
+rule miniasm_assembly:
+    input:
+        filtlong_reads = config['data']+'/merged.after.filtering.fastq',
+        overlaped_reads = join_path(config['outputs']['assemblies']['miniasm'], "overlap.20Kb.paf")
+    output:
+        miniasm_unpolished = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.unpolished.gfa")
+    conda:
+        'envs/miniasm_env.yaml'
+    threads:
+        get_cores_perc(0.2)
+    shell:
+        "miniasm -f {input.filtlong_reads} {input.overlaped_reads} > {output.miniasm_unpolished}"
+# MINIASM:1 ends here
+
+# [[file:../main.org::*MINIPOLISH][MINIPOLISH:1]]
+rule polishing_miniasm_minipolish:
+    input:
+        filtlong_reads = config['data']+'/merged.after.filtering.fastq',
+        miniasm_unpolished = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.unpolished.gfa")
+    output:
+        miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gfa")
     threads:
         get_cores_perc(0.5)
-    conda:
-        'envs/minia_env.yaml'
     shell:
-        "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out outputs/assemblies/minia/minia.k21.a7 -in {input}"
+        "minipolish --threads {threads} {input.filtlong_reads} {input.miniasm_unpolished} > {output.miniasm_minipolish}"
+# MINIPOLISH:1 ends here
 
-		
-rule minia_fasta_to_gfa:
+# [[file:../main.org::*Graphaligner][Graphaligner:1]]
+rule polishing_miniasm_graphaligner:
     input:
-        minia_assembly="outputs/assemblies/minia/minia.k21.a7.contigs.fa",
-	script=os.path.join(os.path.dirname(workflow.snakefile),'scripts', 'convertToGFA.py')
+        raw_reads=config['data']+'/merged.before.filtering.fastq',
+        miniasm_unpolished = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.unpolished.gfa")
+        # miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gfa")
     output:
-        minia_assembly_gfa="outputs/assemblies/minia/minia.k21.a7.contigs.gfa"
+        miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.gfa"),
+        gf_gaf=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.gaf")
+    threads:
+        get_cores_perc(0.5)
     params:
-        **config['params']['minia']
-    conda:
-        'envs/minia_env.yaml'
+        dbtype = "vg",
+        seed_minimizer = 15
     shell:
-        "python {input.script} {input.minia_assembly} {output.minia_assembly_gfa} {params.kmer}"
-
-
-
+        "GraphAligner -g {input.miniasm_unpolished} -f {input.raw_reads} -x {params.dbtype} --threads {threads} --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.gf_gaf} --corrected-out {output.miniasm_graphaligner}"
+# Graphaligner:1 ends here
