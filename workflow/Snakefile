@@ -23,12 +23,8 @@ minia_prefix="outputs/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abun
 # [[file:../main.org::*ALL][ALL:1]]
 rule all:
     input:
-        reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
+        # reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
         nanoplot_out=expand(itget('before','after')(output_dirs['nanoplot'])),
-	minia_assembly=minia_prefix+".contigs.fa",
-        miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.gfa"),
-        minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.gfa',
-        minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gfa"),
         figures=expand(join_path('outputs','bandage')+"/{graph}.svg", graph=("miniasm","minipolish","minia"))
         # miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa",
 # ALL:1 ends here
@@ -76,7 +72,7 @@ rule minia:
     input:
         config['data']+'/merged.after.filtering.fastq'
     output:
-	minia_assembly=minia_prefix+".contigs.fa"
+        minia_assembly=minia_prefix+".contigs.fa"
     threads:
         get_cores_perc(0.5)
     params:
@@ -85,13 +81,13 @@ rule minia:
     conda:
         'envs/minia_env.yaml'
     shell:
-        "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out {params.prefix_fasta} -in {input} && echo {output.minia_assembly}"
+        "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out {params.prefix_fasta} -in {input}"
 # MINIA3:1 ends here
 
 # [[file:../main.org::*FASTA_TO_GFA][FASTA_TO_GFA:1]]
 rule minia_fasta_to_gfa:
     input:
-	minia_assembly=minia_prefix+".contigs.fa",
+        minia_assembly=minia_prefix+".contigs.fa",
         script=join_path(snakefile_path, 'scripts', 'convertToGFA.py'),
     output:
         minia_assembly_gfa=minia_prefix+'.contigs.gfa'

@@ -82,7 +82,7 @@ join_path = lambda *args: os.path.join(*args)
 output_dirs = config['outputs']
 snakefile_path = os.path.dirname(workflow.snakefile)
 SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
-minia_prefix="outputs/assemblies/minia/minia.k{}.a{}.contigs".format(*itget("kmer","abundance")(config['params']['minia']))
+minia_prefix="outputs/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
 #+END_SRC
 
 ** RULES
@@ -92,8 +92,9 @@ rule all:
     input:
         reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
         nanoplot_out=expand(itget('before','after')(output_dirs['nanoplot'])),
+        minia_assembly=minia_prefix+".contigs.fa",
         miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.gfa"),
-        minia_assembly_gfa_polished=minia_prefix+'.polished.gfa',
+        minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.gfa',
         minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gfa"),
         figures=expand(join_path('outputs','bandage')+"/{graph}.svg", graph=("miniasm","minipolish","minia"))
         # miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa",
@@ -147,36 +148,39 @@ rule minia:
     input:
         config['data']+'/merged.after.filtering.fastq'
     output:
-        minia_assembly_fasta=minia_prefix+'.fa'
+        minia_assembly=minia_prefix+".contigs.fa"
     threads:
         get_cores_perc(0.5)
     params:
-        **config['params']['minia'],
+        ,**config['params']['minia'],
+        prefix_fasta=minia_prefix
     conda:
         'envs/minia_env.yaml'
     shell:
-        "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out {output.minia_assembly_fasta} -in {input}"
+        "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out {params.prefix_fasta} -in {input}"
 #+END_SRC
 
 *** FASTA_TO_GFA
 #+BEGIN_SRC snakemake
 rule minia_fasta_to_gfa:
     input:
-        minia_assembly_fasta=minia_prefix+'.fa',
+	minia_assembly=minia_prefix+".contigs.fa",
         script=join_path(snakefile_path, 'scripts', 'convertToGFA.py'),
     output:
-        minia_assembly_gfa=minia_prefix+'.gfa'
+        minia_assembly_gfa=minia_prefix+'.contigs.gfa'
     params:
         **config['params']['minia'],
     conda:
         'envs/minia_env.yaml'
     shell:
-        "python {input.script} {input.minia_assembly_fasta} {output.minia_assembly_gfa} {params.kmer}"
+        "python {input.script} {input.minia_assembly} {output.minia_assembly_gfa} {params.kmer}"
 #+END_SRC
 
 *** MINIMAP
 #+BEGIN_SRC snakemake
 rule overlap_filtered_reads:
+    conda:
+        'envs/miniasm_env.yaml'
     input:
         filtlong_reads = config['data']+'/merged.after.filtering.fastq'
     output:
@@ -264,10 +268,10 @@ rule polishing_graphaligner_minia:
         'envs/graphaligner_env.yaml'
     input:
         raw_reads=config['data']+'/merged.before.filtering.fastq',
-        minia_assembly_gfa=minia_prefix+'.gfa'
+        minia_assembly_gfa=minia_prefix+'.contigs.gfa'
     output:
-        minia_gaf=minia_prefix+'.gaf',
-        minia_assembly_gfa_polished=minia_prefix+'.polished.gfa'
+        minia_gaf=minia_prefix+'.contigs.gaf',
+        minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.gfa'
     threads:
         get_cores_perc(0.5)
     params:
@@ -289,7 +293,6 @@ rule bandage_plot_miniasm:
         'envs/bandage_env.yaml'
     shell:
         "Bandage image {output.figura} {output.figura} --query {input.parental_phages}"
-
 #+END_SRC
 
 *** Bandage minipolish
@@ -311,7 +314,7 @@ rule bandage_plot_minipolish:
 rule bandage_plot_minia:
     input:
         parental_phages = config['parental_phages'],
-        minia_assembly_gfa_polished=minia_prefix+'.polished.gfa'
+        minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.gfa'
     output:
         figura=join_path('outputs','bandage')+"/minia.svg"
     conda:
