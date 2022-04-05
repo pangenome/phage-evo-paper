@@ -1,15 +1,15 @@
+# [[file:../main.org::*CONFIGS][CONFIGS:1]]
 data: 'data'
 
 # Input
 reads: 'data/fastq'
+parental_phages: 'data/genomes/phage/parental.phage.merged.fasta'
 
 # Outputs
 outputs:
   nanoplot:
-    before:
-      'outputs/nanoplot/before_filter'
-    after:
-      'outputs/nanoplot/after_filter'
+    before: 'outputs/nanoplot/before_filter'
+    after: 'outputs/nanoplot/after_filter'
   assemblies:
     minia: 'outputs/assemblies/minia'
     miniasm: 'outputs/assemblies/miniasm'
@@ -20,7 +20,8 @@ outputs:
 params:
   minia:
     kmer: 21
-    abundance: 10
+    abundance: 7
   filtlong:
-    min_length: 1000
-    keep_percent: 95
+    min_length: 20_000
+    keep_percent: 100
+# CONFIGS:1 ends here

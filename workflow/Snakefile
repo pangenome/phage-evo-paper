@@ -14,9 +14,10 @@ join_path = lambda *args: os.path.join(*args)
 # FUNCTIONS:1 ends here
 
 # [[file:../main.org::*GLOBAL VARIABLES][GLOBAL VARIABLES:1]]
-snakefile_path = os.path.dirname(workflow.snakefile)
 output_dirs = config['outputs']
+snakefile_path = os.path.dirname(workflow.snakefile)
 SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
+minia_prefix="outputs/assemblies/minia/minia.k{}.a{}.contigs".format(*itget("kmer","abundance")(config['params']['minia']))
 # GLOBAL VARIABLES:1 ends here
 
 # [[file:../main.org::*ALL][ALL:1]]
@@ -24,8 +25,10 @@ rule all:
     input:
         reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
         nanoplot_out=expand(itget('before','after')(output_dirs['nanoplot'])),
-        miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gfa"),
-        miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.gfa")
+        miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.gfa"),
+        minia_assembly_gfa_polished=minia_prefix+'.polished.gfa',
+        minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gfa"),
+        figures=expand(join_path('outputs','bandage')+"/{graph}.svg", graph=("miniasm","minipolish","minia"))
         # miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa",
 # ALL:1 ends here
 
@@ -60,8 +63,7 @@ rule filter_reads:
     output:
         config['data']+'/merged.after.filtering.fastq'
     params:
-        min_length = 20_000,
-        keep_percent = 100
+        **config['params']['filtlong']
     conda:
         "envs/filtlong_env.yaml"
     shell:
@@ -69,34 +71,34 @@ rule filter_reads:
 # FILTER READS:1 ends here
 
 # [[file:../main.org::*MINIA3][MINIA3:1]]
-# rule minia:
-#     input:
-#         config['data']+'/merged.after.filtering.fastq'
-#     output:
-#         minia_assembly="outputs/assemblies/minia/minia.k21.a7.contigs.fa"
-#     params:
-#         **config['params']['minia']
-#     threads:
-#         get_cores_perc(0.5)
-#     conda:
-#         'envs/minia_env.yaml'
-#     shell:
-#         "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out outputs/assemblies/minia/minia.k21.a7 -in {input}"
+rule minia:
+    input:
+        config['data']+'/merged.after.filtering.fastq'
+    output:
+        minia_assembly_fasta=minia_prefix+'.fa'
+    threads:
+        get_cores_perc(0.5)
+    params:
+        **config['params']['minia'],
+    conda:
+        'envs/minia_env.yaml'
+    shell:
+        "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out {output.minia_assembly_fasta} -in {input}"
 # MINIA3:1 ends here
 
 # [[file:../main.org::*FASTA_TO_GFA][FASTA_TO_GFA:1]]
-# rule minia_fasta_to_gfa:
-#     input:
-#         minia_assembly="outputs/assemblies/minia/minia.k21.a7.contigs.fa",
-# 	script=os.path.join(os.path.dirname(workflow.snakefile),'scripts', 'convertToGFA.py')
-#     output:
-#         minia_assembly_gfa="outputs/assemblies/minia/minia.k21.a7.contigs.gfa"
-#     params:
-#         **config['params']['minia']
-#     conda:
-#         'envs/minia_env.yaml'
-#     shell:
-#         "python {input.script} {input.minia_assembly} {output.minia_assembly_gfa} {params.kmer}"
+rule minia_fasta_to_gfa:
+    input:
+        minia_assembly_fasta=minia_prefix+'.fa',
+        script=join_path(snakefile_path, 'scripts', 'convertToGFA.py'),
+    output:
+        minia_assembly_gfa=minia_prefix+'.gfa'
+    params:
+        **config['params']['minia'],
+    conda:
+        'envs/minia_env.yaml'
+    shell:
+        "python {input.script} {input.minia_assembly_fasta} {output.minia_assembly_gfa} {params.kmer}"
 # FASTA_TO_GFA:1 ends here
 
 # [[file:../main.org::*MINIMAP][MINIMAP:1]]
@@ -132,22 +134,21 @@ rule polishing_miniasm_minipolish:
         filtlong_reads = config['data']+'/merged.after.filtering.fastq',
         miniasm_unpolished = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.unpolished.gfa")
     output:
-        miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gfa")
+        miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.gfa")
     threads:
         get_cores_perc(0.5)
     shell:
         "minipolish --threads {threads} {input.filtlong_reads} {input.miniasm_unpolished} > {output.miniasm_minipolish}"
 # MINIPOLISH:1 ends here
 
-# [[file:../main.org::*Graphaligner][Graphaligner:1]]
-rule polishing_miniasm_graphaligner:
+# [[file:../main.org::*Graphaligner miniasm][Graphaligner miniasm:1]]
+rule polishing_graphaligner_miniasm:
     input:
         raw_reads=config['data']+'/merged.before.filtering.fastq',
         miniasm_unpolished = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.unpolished.gfa")
-        # miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gfa")
     output:
         miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.gfa"),
-        gf_gaf=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.gaf")
+        gf_gaf=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.gaf"),
     threads:
         get_cores_perc(0.5)
     params:
@@ -155,4 +156,77 @@ rule polishing_miniasm_graphaligner:
         seed_minimizer = 15
     shell:
         "GraphAligner -g {input.miniasm_unpolished} -f {input.raw_reads} -x {params.dbtype} --threads {threads} --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.gf_gaf} --corrected-out {output.miniasm_graphaligner}"
-# Graphaligner:1 ends here
+# Graphaligner miniasm:1 ends here
+
+# [[file:../main.org::*Graphaligner minipolish][Graphaligner minipolish:1]]
+rule polishing_graphaligner_minipolish:
+    input:
+        raw_reads=config['data']+'/merged.before.filtering.fastq',
+        miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.gfa")
+    output:
+        minipolish_gaf=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gaf"),
+        minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gfa")
+    threads:
+        get_cores_perc(0.5)
+    params:
+        dbtype = "vg",
+        seed_minimizer = 15
+    shell:
+        "GraphAligner -g {input.miniasm_minipolish} -f {input.raw_reads} -x {params.dbtype} --threads {threads} --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minipolish_gaf} --corrected-out {output.minipolish_polished}"
+# Graphaligner minipolish:1 ends here
+
+# [[file:../main.org::*Graphaligner MINIA][Graphaligner MINIA:1]]
+rule polishing_graphaligner_minia:
+    input:
+        raw_reads=config['data']+'/merged.before.filtering.fastq',
+        minia_assembly_gfa=minia_prefix+'.gfa'
+    output:
+        minia_gaf=minia_prefix+'.gaf',
+        minia_assembly_gfa_polished=minia_prefix+'.polished.gfa'
+    threads:
+        get_cores_perc(0.5)
+    params:
+        dbtype = "vg",
+        seed_minimizer = 15
+    shell:
+        "GraphAligner -g {input.minia_assembly_gfa} -f {input.raw_reads} -x {params.dbtype} --threads {threads} --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minia_gaf} --corrected-out {output.minia_assembly_gfa_polished}"
+# Graphaligner MINIA:1 ends here
+
+# [[file:../main.org::*Bandage miniasm][Bandage miniasm:1]]
+rule bandage_plot_miniasm:
+    input:
+        parental_phages = config['parental_phages'],
+        minia_graph = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.gfa"),
+    output:
+        figura=join_path('outputs','bandage')+"/miniasm.svg"
+    conda:
+        'envs/bandage_env.yaml'
+    shell:
+        "Bandage image {output.figura} {output.figura} --query {input.parental_phages}"
+# Bandage miniasm:1 ends here
+
+# [[file:../main.org::*Bandage minipolish][Bandage minipolish:1]]
+rule bandage_plot_minipolish:
+    input:
+        parental_phages = config['parental_phages'],
+        minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gfa")
+    output:
+        figura=join_path('outputs','bandage')+"/minipolish.svg"
+    conda:
+        'envs/bandage_env.yaml'
+    shell:
+        "Bandage image {output.figura} {output.figura} --query {input.parental_phages}"
+# Bandage minipolish:1 ends here
+
+# [[file:../main.org::*Bandage minia][Bandage minia:1]]
+rule bandage_plot_minia:
+    input:
+        parental_phages = config['parental_phages'],
+        minia_assembly_gfa_polished=minia_prefix+'.polished.gfa'
+    output:
+        figura=join_path('outputs','bandage')+"/minia.svg"
+    conda:
+        'envs/bandage_env.yaml'
+    shell:
+        "Bandage image {output.figura} {output.figura} --query {input.parental_phages}"
+# Bandage minia:1 ends here
