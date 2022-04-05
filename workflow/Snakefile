@@ -18,6 +18,7 @@ output_dirs = config['outputs']
 snakefile_path = os.path.dirname(workflow.snakefile)
 SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))[:2]
 minia_prefix="outputs/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
+pggb_prefix=".p{}.s{}.n{}".format(*itget("map-pct-id", "n-mappings","segment-length")(config['params']['pggb']))
 # GLOBAL VARIABLES:1 ends here
 
 # [[file:../main.org::*ALL][ALL:1]]
@@ -25,10 +26,11 @@ rule all:
     input:
         # reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
         nanoplot_out=expand(itget('before','after')(output_dirs['nanoplot'])),
-        figures=expand(join_path('outputs','bandage')+"/{graph}.svg", graph=("miniasm","minipolish","minia")),
-        miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.fa"),
-        minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.fa"),
-        minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.fa'
+        pggb_dirs=expand("outputs/pggb/{graph}"+pggb_prefix, graph=("miniasm","minipolish","minia"))
+        # figures=expand(join_path('outputs','bandage')+"/{graph}.svg", graph=("miniasm","minipolish","minia")),
+        # miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.fa"),
+        # minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.fa"),
+        # minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.fa'
         # miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa",
 # ALL:1 ends here
 
@@ -203,41 +205,44 @@ rule polishing_graphaligner_minia:
         "GraphAligner -g {input.minia_assembly_gfa} -f {input.raw_reads} -x {params.dbtype} --threads {threads} --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minia_gaf} --corrected-out {output.minia_assembly_gfa_polished}"
 # Graphaligner MINIA:1 ends here
 
-# [[file:../main.org::*Bandage miniasm][Bandage miniasm:1]]
-rule bandage_plot_miniasm:
+# [[file:../main.org::*PGGB miniasm_polished][PGGB miniasm_polished:1]]
+rule pggb_miniasm:
     input:
-        parental_phages = config['parental_phages'],
-        miniasm_unpolished = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.unpolished.gfa")
+        corrected_reads=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.fa"),
     output:
-        figura=join_path('outputs','bandage')+"/miniasm.svg"
+        directory("outputs/pggb/miniasm"+pggb_prefix)
+    params:
+        **config['params']['pggb']
     conda:
-        'envs/bandage_env.yaml'
+        'envs/pggb_env.yaml'
     shell:
-        "Bandage image {input.miniasm_unpolished} {output.figura} --query {input.parental_phages}"
-# Bandage miniasm:1 ends here
+        "pggb --input-fasta {input.corrected_reads} --map-pct-id {params.map-pct-id} --n-mappings {params.n-mappings} --segment-length {params.segment-length} --output-dir {output}"
+# PGGB miniasm_polished:1 ends here
 
-# [[file:../main.org::*Bandage minipolish][Bandage minipolish:1]]
-rule bandage_plot_minipolish:
+# [[file:../main.org::*PGGB minipolish_polished][PGGB minipolish_polished:1]]
+rule pggb_minipolish:
     input:
-        parental_phages = config['parental_phages'],
-        miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.gfa")
+        corrected_reads=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.fa")
     output:
-        figura=join_path('outputs','bandage')+"/minipolish.svg"
+        directory("outputs/pggb/minipolish"+pggb_prefix)
+    params:
+        **config['params']['pggb']
     conda:
-        'envs/bandage_env.yaml'
+        'envs/pggb_env.yaml'
     shell:
-        "Bandage image {input.miniasm_minipolish} {output.figura} --query {input.parental_phages}"
-# Bandage minipolish:1 ends here
+        "pggb --input-fasta {input.corrected_reads} --map-pct-id {params.map-pct-id} --n-mappings {params.n-mappings} --segment-length {params.segment-length} --output-dir {output}"
+# PGGB minipolish_polished:1 ends here
 
-# [[file:../main.org::*Bandage minia][Bandage minia:1]]
-rule bandage_plot_minia:
+# [[file:../main.org::*PGGB minia_polished][PGGB minia_polished:1]]
+rule pggb_minia:
     input:
-        parental_phages = config['parental_phages'],
-        minia_gfa=minia_prefix+'.contigs.gfa',
+        corrected_reads=minia_prefix+'.contigs.polished.fa'
     output:
-        figura=join_path('outputs','bandage')+"/minia.svg"
+        directory("outputs/pggb/minia"+pggb_prefix)
+    params:
+        **config['params']['pggb']
     conda:
-        'envs/bandage_env.yaml'
+        'envs/pggb_env.yaml'
     shell:
-        "Bandage image {input.minia_gfa} {output.figura} --query {input.parental_phages}"
-# Bandage minia:1 ends here
+        "pggb --input-fasta {input.corrected_reads} --map-pct-id {params.map-pct-id} --n-mappings {params.n-mappings} --segment-length {params.segment-length} --output-dir {output}"
+# PGGB minia_polished:1 ends here

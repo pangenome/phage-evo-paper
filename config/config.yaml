@@ -22,6 +22,10 @@ params:
     kmer: 21
     abundance: 7
   filtlong:
-    min_length: 20_000
     keep_percent: 98
+    min_length: 20_000
+  pggb:
+    map-pct-id: 90
+    n-mappings: 100
+    segment-length: 1_000
 # CONFIGS:1 ends here

@@ -81,8 +81,9 @@ join_path = lambda *args: os.path.join(*args)
 #+BEGIN_SRC snakemake
 output_dirs = config['outputs']
 snakefile_path = os.path.dirname(workflow.snakefile)
-SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
+SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))[:2]
 minia_prefix="outputs/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
+pggb_prefix=".p{}.s{}.n{}".format(*itget("map-pct-id", "n-mappings","segment-length")(config['params']['pggb']))
 #+END_SRC
 
 ** RULES
@@ -90,13 +91,13 @@ minia_prefix="outputs/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abun
 #+BEGIN_SRC snakemake
 rule all:
     input:
-        reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
+        # reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
         nanoplot_out=expand(itget('before','after')(output_dirs['nanoplot'])),
-        minia_assembly=minia_prefix+".contigs.fa",
-        miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.gfa"),
-        minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.gfa',
-        minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gfa"),
-        figures=expand(join_path('outputs','bandage')+"/{graph}.svg", graph=("miniasm","minipolish","minia"))
+        pggb_dirs=expand("outputs/pggb/{graph}"+pggb_prefix, graph=("miniasm","minipolish","minia"))
+        # figures=expand(join_path('outputs','bandage')+"/{graph}.svg", graph=("miniasm","minipolish","minia")),
+        # miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.fa"),
+        # minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.fa"),
+        # minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.fa'
         # miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa",
 #+END_SRC
 *** Merge reads
@@ -152,7 +153,7 @@ rule minia:
     threads:
         get_cores_perc(0.5)
     params:
-        ,**config['params']['minia'],
+        **config['params']['minia'],
         prefix_fasta=minia_prefix
     conda:
         'envs/minia_env.yaml'
@@ -164,7 +165,7 @@ rule minia:
 #+BEGIN_SRC snakemake
 rule minia_fasta_to_gfa:
     input:
-	minia_assembly=minia_prefix+".contigs.fa",
+        minia_assembly=minia_prefix+".contigs.fa",
         script=join_path(snakefile_path, 'scripts', 'convertToGFA.py'),
     output:
         minia_assembly_gfa=minia_prefix+'.contigs.gfa'
@@ -186,7 +187,7 @@ rule overlap_filtered_reads:
     output:
         overlaped_reads = join_path(config['outputs']['assemblies']['miniasm'], "overlap.20Kb.paf")
     threads:
-        get_cores_perc(1)
+        get_cores_perc(0.5)
     shell:
         "minimap2 -x ava-ont -t {threads} {input.filtlong_reads} {input.filtlong_reads} > {output.overlaped_reads}"
 #+END_SRC
@@ -217,6 +218,8 @@ rule polishing_miniasm_minipolish:
         miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.gfa")
     threads:
         get_cores_perc(0.5)
+    conda:
+        'envs/miniasm_env.yaml'
     shell:
         "minipolish --threads {threads} {input.filtlong_reads} {input.miniasm_unpolished} > {output.miniasm_minipolish}"
 #+END_SRC
@@ -230,7 +233,7 @@ rule polishing_graphaligner_miniasm:
         raw_reads=config['data']+'/merged.before.filtering.fastq',
         miniasm_unpolished = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.unpolished.gfa")
     output:
-        miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.gfa"),
+        miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.fa"),
         gf_gaf=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.gaf"),
     threads:
         get_cores_perc(0.5)
@@ -251,7 +254,7 @@ rule polishing_graphaligner_minipolish:
         miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.gfa")
     output:
         minipolish_gaf=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gaf"),
-        minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gfa")
+        minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.fa")
     threads:
         get_cores_perc(0.5)
     params:
@@ -271,7 +274,7 @@ rule polishing_graphaligner_minia:
         minia_assembly_gfa=minia_prefix+'.contigs.gfa'
     output:
         minia_gaf=minia_prefix+'.contigs.gaf',
-        minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.gfa'
+        minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.fa'
     threads:
         get_cores_perc(0.5)
     params:
@@ -281,46 +284,48 @@ rule polishing_graphaligner_minia:
         "GraphAligner -g {input.minia_assembly_gfa} -f {input.raw_reads} -x {params.dbtype} --threads {threads} --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minia_gaf} --corrected-out {output.minia_assembly_gfa_polished}"
 #+END_SRC
 
-*** Bandage miniasm
+*** PGGB miniasm_polished
 #+BEGIN_SRC snakemake
-rule bandage_plot_miniasm:
+rule pggb_miniasm:
     input:
-        parental_phages = config['parental_phages'],
-        minia_graph = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.gfa"),
+        corrected_reads=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.fa"),
     output:
-        figura=join_path('outputs','bandage')+"/miniasm.svg"
+        directory("outputs/pggb/miniasm"+pggb_prefix)
+    params:
+        ,**config['params']['pggb']
     conda:
-        'envs/bandage_env.yaml'
+        'envs/pggb_env.yaml'
     shell:
-        "Bandage image {output.figura} {output.figura} --query {input.parental_phages}"
+        "pggb --input-fasta {input.corrected_reads} --map-pct-id {params.map-pct-id} --n-mappings {params.n-mappings} --segment-length {params.segment-length} --output-dir {output}"
 #+END_SRC
 
-*** Bandage minipolish
+*** PGGB minipolish_polished
 #+BEGIN_SRC snakemake
-rule bandage_plot_minipolish:
+rule pggb_minipolish:
     input:
-        parental_phages = config['parental_phages'],
-        minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gfa")
+        corrected_reads=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.fa")
     output:
-        figura=join_path('outputs','bandage')+"/minipolish.svg"
+        directory("outputs/pggb/minipolish"+pggb_prefix)
+    params:
+        ,**config['params']['pggb']
     conda:
-        'envs/bandage_env.yaml'
+        'envs/pggb_env.yaml'
     shell:
-        "Bandage image {output.figura} {output.figura} --query {input.parental_phages}"
+        "pggb --input-fasta {input.corrected_reads} --map-pct-id {params.map-pct-id} --n-mappings {params.n-mappings} --segment-length {params.segment-length} --output-dir {output}"
 #+END_SRC
-
-*** Bandage minia
+*** PGGB minia_polished
 #+BEGIN_SRC snakemake
-rule bandage_plot_minia:
+rule pggb_minia:
     input:
-        parental_phages = config['parental_phages'],
-        minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.gfa'
+        corrected_reads=minia_prefix+'.contigs.polished.fa'
     output:
-        figura=join_path('outputs','bandage')+"/minia.svg"
+        directory("outputs/pggb/minia"+pggb_prefix)
+    params:
+        ,**config['params']['pggb']
     conda:
-        'envs/bandage_env.yaml'
+        'envs/pggb_env.yaml'
     shell:
-        "Bandage image {output.figura} {output.figura} --query {input.parental_phages}"
+        "pggb --input-fasta {input.corrected_reads} --map-pct-id {params.map-pct-id} --n-mappings {params.n-mappings} --segment-length {params.segment-length} --output-dir {output}"
 #+END_SRC
 
 ** TODO Create Rules [1/7]
@@ -360,8 +365,12 @@ params:
     kmer: 21
     abundance: 7
   filtlong:
+    keep_percent: 98
     min_length: 20_000
-    keep_percent: 100
+  pggb:
+    map-pct-id: 90
+    n-mappings: 100
+    segment-length: 1_000
 #+END_SRC
 * ENVS
 :PROPERTIES:
