@@ -23,5 +23,5 @@ params:
     abundance: 7
   filtlong:
     min_length: 20_000
-    keep_percent: 100
+    keep_percent: 98
 # CONFIGS:1 ends here
