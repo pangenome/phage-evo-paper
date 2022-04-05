@@ -143,6 +143,8 @@ rule polishing_miniasm_minipolish:
 
 # [[file:../main.org::*Graphaligner miniasm][Graphaligner miniasm:1]]
 rule polishing_graphaligner_miniasm:
+    conda:
+        'envs/graphaligner_env.yaml'
     input:
         raw_reads=config['data']+'/merged.before.filtering.fastq',
         miniasm_unpolished = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.unpolished.gfa")
@@ -160,6 +162,8 @@ rule polishing_graphaligner_miniasm:
 
 # [[file:../main.org::*Graphaligner minipolish][Graphaligner minipolish:1]]
 rule polishing_graphaligner_minipolish:
+    conda:
+        'envs/graphaligner_env.yaml'
     input:
         raw_reads=config['data']+'/merged.before.filtering.fastq',
         miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.gfa")
@@ -177,6 +181,8 @@ rule polishing_graphaligner_minipolish:
 
 # [[file:../main.org::*Graphaligner MINIA][Graphaligner MINIA:1]]
 rule polishing_graphaligner_minia:
+    conda:
+        'envs/graphaligner_env.yaml'
     input:
         raw_reads=config['data']+'/merged.before.filtering.fastq',
         minia_assembly_gfa=minia_prefix+'.gfa'
