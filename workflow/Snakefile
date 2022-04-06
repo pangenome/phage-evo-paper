@@ -16,7 +16,7 @@ join_path = lambda *args: os.path.join(*args)
 # [[file:../main.org::*GLOBAL VARIABLES][GLOBAL VARIABLES:1]]
 output_dirs = config['outputs']
 snakefile_path = os.path.dirname(workflow.snakefile)
-SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))[:2]
+SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
 minia_prefix="outputs/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
 pggb_prefix=".p{}.s{}.n{}".format(*itget("map-pct-id", "n-mappings","segment-length")(config['params']['pggb']))
 # GLOBAL VARIABLES:1 ends here
@@ -24,14 +24,9 @@ pggb_prefix=".p{}.s{}.n{}".format(*itget("map-pct-id", "n-mappings","segment-len
 # [[file:../main.org::*ALL][ALL:1]]
 rule all:
     input:
-        # reads_sets=expand(config['data']+'/merged.{status}.filtering.fastq', status=('before','after')),
         nanoplot_out=expand(itget('before','after')(output_dirs['nanoplot'])),
-        pggb_dirs=expand("outputs/pggb/{graph}"+pggb_prefix, graph=("miniasm","minipolish","minia"))
-        # figures=expand(join_path('outputs','bandage')+"/{graph}.svg", graph=("miniasm","minipolish","minia")),
-        # miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.fa"),
-        # minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.fa"),
-        # minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.fa'
-        # miniasm_assembly="outputs/assemblies/miniasm/miniasm.polished.gfa",
+        pggb_dirs=expand("outputs/pggb/{graph}"+pggb_prefix, graph=("minia"))
+        # pggb_dirs=expand("outputs/pggb/{graph}"+pggb_prefix, graph=("miniasm","minipolish","minia"))
 # ALL:1 ends here
 
 # [[file:../main.org::*Merge reads][Merge reads:1]]
@@ -105,85 +100,85 @@ rule minia_fasta_to_gfa:
 # FASTA_TO_GFA:1 ends here
 
 # [[file:../main.org::*MINIMAP][MINIMAP:1]]
-rule overlap_filtered_reads:
-    conda:
-        'envs/miniasm_env.yaml'
-    input:
-        filtlong_reads = config['data']+'/merged.after.filtering.fastq'
-    output:
-        overlaped_reads = join_path(config['outputs']['assemblies']['miniasm'], "overlap.20Kb.paf")
-    threads:
-        get_cores_perc(0.5)
-    shell:
-        "minimap2 -x ava-ont -t {threads} {input.filtlong_reads} {input.filtlong_reads} > {output.overlaped_reads}"
+# rule overlap_filtered_reads:
+#     conda:
+#         'envs/miniasm_env.yaml'
+#     input:
+#         filtlong_reads = config['data']+'/merged.after.filtering.fastq'
+#     output:
+#         overlaped_reads = join_path(config['outputs']['assemblies']['miniasm'], "overlap.20Kb.paf")
+#     threads:
+#         get_cores_perc(0.5)
+#     shell:
+#         "minimap2 -x ava-ont -t {threads} {input.filtlong_reads} {input.filtlong_reads} > {output.overlaped_reads}"
 # MINIMAP:1 ends here
 
 # [[file:../main.org::*MINIASM][MINIASM:1]]
-rule miniasm_assembly:
-    input:
-        filtlong_reads = config['data']+'/merged.after.filtering.fastq',
-        overlaped_reads = join_path(config['outputs']['assemblies']['miniasm'], "overlap.20Kb.paf")
-    output:
-        miniasm_unpolished = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.unpolished.gfa")
-    conda:
-        'envs/miniasm_env.yaml'
-    threads:
-        get_cores_perc(0.2)
-    shell:
-        "miniasm -f {input.filtlong_reads} {input.overlaped_reads} > {output.miniasm_unpolished}"
+# rule miniasm_assembly:
+#     input:
+#         filtlong_reads = config['data']+'/merged.after.filtering.fastq',
+#         overlaped_reads = join_path(config['outputs']['assemblies']['miniasm'], "overlap.20Kb.paf")
+#     output:
+#         miniasm_unpolished = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.unpolished.gfa")
+#     conda:
+#         'envs/miniasm_env.yaml'
+#     threads:
+#         get_cores_perc(0.2)
+#     shell:
+#         "miniasm -f {input.filtlong_reads} {input.overlaped_reads} > {output.miniasm_unpolished}"
 # MINIASM:1 ends here
 
 # [[file:../main.org::*MINIPOLISH][MINIPOLISH:1]]
-rule polishing_miniasm_minipolish:
-    input:
-        filtlong_reads = config['data']+'/merged.after.filtering.fastq',
-        miniasm_unpolished = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.unpolished.gfa")
-    output:
-        miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.gfa")
-    threads:
-        get_cores_perc(0.5)
-    conda:
-        'envs/miniasm_env.yaml'
-    shell:
-        "minipolish --threads {threads} {input.filtlong_reads} {input.miniasm_unpolished} > {output.miniasm_minipolish}"
+# rule polishing_miniasm_minipolish:
+#     input:
+#         filtlong_reads = config['data']+'/merged.after.filtering.fastq',
+#         miniasm_unpolished = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.unpolished.gfa")
+#     output:
+#         miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.gfa")
+#     threads:
+#         get_cores_perc(0.5)
+#     conda:
+#         'envs/miniasm_env.yaml'
+#     shell:
+#         "minipolish --threads {threads} {input.filtlong_reads} {input.miniasm_unpolished} > {output.miniasm_minipolish}"
 # MINIPOLISH:1 ends here
 
 # [[file:../main.org::*Graphaligner miniasm][Graphaligner miniasm:1]]
-rule polishing_graphaligner_miniasm:
-    conda:
-        'envs/graphaligner_env.yaml'
-    input:
-        raw_reads=config['data']+'/merged.before.filtering.fastq',
-        miniasm_unpolished = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.unpolished.gfa")
-    output:
-        miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.fa"),
-        gf_gaf=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.gaf"),
-    threads:
-        get_cores_perc(0.5)
-    params:
-        dbtype = "vg",
-        seed_minimizer = 15
-    shell:
-        "GraphAligner -g {input.miniasm_unpolished} -f {input.raw_reads} -x {params.dbtype} --threads {threads} --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.gf_gaf} --corrected-out {output.miniasm_graphaligner}"
+# rule polishing_graphaligner_miniasm:
+#     conda:
+#         'envs/graphaligner_env.yaml'
+#     input:
+#         raw_reads=config['data']+'/merged.before.filtering.fastq',
+#         miniasm_unpolished = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.unpolished.gfa")
+#     output:
+#         miniasm_graphaligner = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.fa"),
+#         gf_gaf=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.gaf"),
+#     threads:
+#         get_cores_perc(0.5)
+#     params:
+#         dbtype = "vg",
+#         seed_minimizer = 15
+#     shell:
+#         "GraphAligner -g {input.miniasm_unpolished} -f {input.raw_reads} -x {params.dbtype} --threads {threads} --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.gf_gaf} --corrected-out {output.miniasm_graphaligner}"
 # Graphaligner miniasm:1 ends here
 
 # [[file:../main.org::*Graphaligner minipolish][Graphaligner minipolish:1]]
-rule polishing_graphaligner_minipolish:
-    conda:
-        'envs/graphaligner_env.yaml'
-    input:
-        raw_reads=config['data']+'/merged.before.filtering.fastq',
-        miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.gfa")
-    output:
-        minipolish_gaf=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gaf"),
-        minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.fa")
-    threads:
-        get_cores_perc(0.5)
-    params:
-        dbtype = "vg",
-        seed_minimizer = 15
-    shell:
-        "GraphAligner -g {input.miniasm_minipolish} -f {input.raw_reads} -x {params.dbtype} --threads {threads} --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minipolish_gaf} --corrected-out {output.minipolish_polished}"
+# rule polishing_graphaligner_minipolish:
+#     conda:
+#         'envs/graphaligner_env.yaml'
+#     input:
+#         raw_reads=config['data']+'/merged.before.filtering.fastq',
+#         miniasm_minipolish = join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.gfa")
+#     output:
+#         minipolish_gaf=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.gaf"),
+#         minipolish_polished=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.fa")
+#     threads:
+#         get_cores_perc(0.5)
+#     params:
+#         dbtype = "vg",
+#         seed_minimizer = 15
+#     shell:
+#         "GraphAligner -g {input.miniasm_minipolish} -f {input.raw_reads} -x {params.dbtype} --threads {threads} --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minipolish_gaf} --corrected-out {output.minipolish_polished}"
 # Graphaligner minipolish:1 ends here
 
 # [[file:../main.org::*Graphaligner MINIA][Graphaligner MINIA:1]]
@@ -197,7 +192,7 @@ rule polishing_graphaligner_minia:
         minia_gaf=minia_prefix+'.contigs.gaf',
         minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.fa'
     threads:
-        get_cores_perc(0.5)
+        get_cores_perc(1)
     params:
         dbtype = "vg",
         seed_minimizer = 15
@@ -206,31 +201,35 @@ rule polishing_graphaligner_minia:
 # Graphaligner MINIA:1 ends here
 
 # [[file:../main.org::*PGGB miniasm_polished][PGGB miniasm_polished:1]]
-rule pggb_miniasm:
-    input:
-        corrected_reads=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.fa"),
-    output:
-        directory("outputs/pggb/miniasm"+pggb_prefix)
-    params:
-        **config['params']['pggb']
-    conda:
-        'envs/pggb_env.yaml'
-    shell:
-        "pggb --input-fasta {input.corrected_reads} --map-pct-id {params.map-pct-id} --n-mappings {params.n-mappings} --segment-length {params.segment-length} --output-dir {output}"
+# rule pggb_miniasm:
+#     input:
+#         corrected_reads=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.graphaligner.polished.fa"),
+#     output:
+#         directory("outputs/pggb/miniasm"+pggb_prefix)
+#     params:
+#         **config['params']['pggb']
+#     conda:
+#         'envs/pggb_env.yaml'
+#     threads:
+#         get_cores_perc(0.33)
+#     shell:
+#         "pggb -i {input.corrected_reads} -p {params.map-pct-id} -n {params.n-mappings} -s {params.segment-length} -t {threads} -o {output} -m"
 # PGGB miniasm_polished:1 ends here
 
 # [[file:../main.org::*PGGB minipolish_polished][PGGB minipolish_polished:1]]
-rule pggb_minipolish:
-    input:
-        corrected_reads=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.fa")
-    output:
-        directory("outputs/pggb/minipolish"+pggb_prefix)
-    params:
-        **config['params']['pggb']
-    conda:
-        'envs/pggb_env.yaml'
-    shell:
-        "pggb --input-fasta {input.corrected_reads} --map-pct-id {params.map-pct-id} --n-mappings {params.n-mappings} --segment-length {params.segment-length} --output-dir {output}"
+# rule pggb_minipolish:
+#     input:
+#         corrected_reads=join_path(config['outputs']['assemblies']['miniasm'], "miniasm.minipolish.polished.fa")
+#     output:
+#         directory("outputs/pggb/minipolish"+pggb_prefix)
+#     params:
+#         **config['params']['pggb']
+#     conda:
+#         'envs/pggb_env.yaml'
+#     threads:
+#         get_cores_perc(0.33)
+#     shell:
+#         "pggb -i {input.corrected_reads} -p {params.map-pct-id} -n {params.n-mappings} -s {params.segment-length} -t {threads} -o {output} -m"
 # PGGB minipolish_polished:1 ends here
 
 # [[file:../main.org::*PGGB minia_polished][PGGB minia_polished:1]]
@@ -243,6 +242,8 @@ rule pggb_minia:
         **config['params']['pggb']
     conda:
         'envs/pggb_env.yaml'
+    threads:
+        get_cores_perc(0.5)
     shell:
-        "pggb --input-fasta {input.corrected_reads} --map-pct-id {params.map-pct-id} --n-mappings {params.n-mappings} --segment-length {params.segment-length} --output-dir {output}"
+        "pggb -i {input.corrected_reads} -p {params.map-pct-id} -n {params.n-mappings} -s {params.segment-length} -t {threads} -o {output} -m"
 # PGGB minia_polished:1 ends here
