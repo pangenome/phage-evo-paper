@@ -11,14 +11,19 @@ configfile: 'config/config.yaml'
 # [[file:../main.org::*FUNCTIONS][FUNCTIONS:1]]
 get_cores_perc = lambda perc: max(1, workflow.cores * perc)
 join_path = lambda *args: os.path.join(*args)
+get_Kbs = lambda x: int(x/1_000)
 # FUNCTIONS:1 ends here
 
 # [[file:../main.org::*GLOBAL VARIABLES][GLOBAL VARIABLES:1]]
 output_dirs = config['outputs']
 snakefile_path = os.path.dirname(workflow.snakefile)
 SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
+
+# Prefixes
 minia_prefix="outputs/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
 pggb_prefix=".p{}.s{}.n{}".format(*itget("map-pct-id", "n-mappings","segment-length")(config['params']['pggb']))
+# Suffixes
+filter_contigs_prefix = minia_prefix + '.min{}Kb.max{}Kb'.format(*iter(map(get_Kbs, itget('min_contig_lenght', 'max_contig_lenght')(config['params']['minia']))))
 # GLOBAL VARIABLES:1 ends here
 
 # [[file:../main.org::*ALL][ALL:1]]
@@ -26,7 +31,6 @@ rule all:
     input:
         nanoplot_out=expand(itget('before','after')(output_dirs['nanoplot'])),
         pggb_dirs=expand("outputs/pggb/{graph}"+pggb_prefix, graph=("minia"))
-        # pggb_dirs=expand("outputs/pggb/{graph}"+pggb_prefix, graph=("miniasm","minipolish","minia"))
 # ALL:1 ends here
 
 # [[file:../main.org::*Merge reads][Merge reads:1]]
@@ -118,10 +122,25 @@ rule polishing_graphaligner_minia:
         "GraphAligner -g {input.minia_assembly_gfa} -f {input.raw_reads} -x {params.dbtype} --threads {threads} --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minia_gaf} --corrected-out {output.minia_assembly_gfa_polished}"
 # Graphaligner MINIA:1 ends here
 
+# [[file:../main.org::*Filter by length][Filter by length:1]]
+rule filter_by_length:
+    input:
+        minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.fa',
+        script = join_path(snakefile_path, 'scripts', 'filter_by_length.py')
+    output:
+        minia_assembly_polished_filtered = minia_prefix + '.contigs.polished' + filter_contigs_prefix + '.fa'
+    params:
+        **config['params']['minia']
+    conda:
+        'envs/bio_env.yaml'
+    shell:
+        "python3 {input.script} {params.min_contig_lenght}  {params.max_contig_lenght} > {output.minia_assembly_polished_filtered}"
+# Filter by length:1 ends here
+
 # [[file:../main.org::*PGGB minia_polished][PGGB minia_polished:1]]
 rule pggb_minia:
     input:
-        corrected_reads=minia_prefix+'.contigs.polished.fa'
+        minia_assembly_polished_filtered = minia_prefix + '.contigs.polished' + filter_contigs_prefix + '.fa'
     output:
         directory("outputs/pggb/minia"+pggb_prefix)
     params:
@@ -131,5 +150,5 @@ rule pggb_minia:
     threads:
         get_cores_perc(0.5)
     shell:
-        "pggb -i {input.corrected_reads} -p {params.map-pct-id} -n {params.n-mappings} -s {params.segment-length} -t {threads} -o {output} -m"
+        "pggb -i {input.minia_assembly_polished_filtered} -p {params.map-pct-id} -n {params.n-mappings} -s {params.segment-length} -t {threads} -o {output} -m"
 # PGGB minia_polished:1 ends here

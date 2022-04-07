@@ -21,6 +21,8 @@ params:
   minia:
     kmer: 21
     abundance: 7
+    min_contig_lenght: 20_000
+    max_contig_lenght: 200_000
   filtlong:
     keep_percent: 98
     min_length: 20_000
