@@ -132,9 +132,9 @@ rule filter_by_length:
     params:
         **config['params']['minia']
     conda:
-        'envs/bio_env.yaml'
+        'envs/nanoplot_env.yaml'
     shell:
-        "python3 {input.script} {params.min_contig_lenght}  {params.max_contig_lenght} > {output.minia_assembly_polished_filtered}"
+        "{input.script} {input.minia_assembly_gfa_polished} {params.min_contig_lenght}  {params.max_contig_lenght} > {output.minia_assembly_polished_filtered}"
 # Filter by length:1 ends here
 
 # [[file:../main.org::*PGGB minia_polished][PGGB minia_polished:1]]
