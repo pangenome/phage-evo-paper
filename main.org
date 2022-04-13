@@ -78,6 +78,7 @@ get_cores_perc = lambda perc: max(1, workflow.cores * perc)
 join_path = lambda *args: os.path.join(*args)
 get_Kbs = lambda x: int(x/1_000)
 #+END_SRC
+
 ** GLOBAL VARIABLES
 #+BEGIN_SRC snakemake
 output_dirs = config['outputs']
@@ -227,6 +228,79 @@ rule pggb_minia:
     shell:
         "pggb -i {input.minia_assembly_polished_filtered} -p {params.map-pct-id} -n {params.n-mappings} -s {params.segment-length} -t {threads} -o {output} -m"
 #+END_SRC
+* Modules
+** Parental Genomes Mapping
+:PROPERTIES:
+:COOKIE_DATA: todo recursive
+:header-args: :tangle workflow/rules/parental_genomes_mapping.smk :mkdirp yes :exports none :eval never-export :comments link
+:END:
+*** IMPORTS
+#+BEGIN_SRC snakemake
+import os
+import sys
+from operator import itemgetter as itget
+#+END_SRC
+
+*** FILE CONFIGS
+#+BEGIN_SRC snakemake
+configfile: 'config/config.yaml'
+#+END_SRC
+
+*** FUNCTIONS
+#+BEGIN_SRC snakemake
+get_cores_perc = lambda perc: max(1, workflow.cores * perc)
+join_path = lambda *args: os.path.join(*args)
+get_Kbs = lambda x: int(x/1_000)
+#+END_SRC
+
+*** GLOBAL VARIABLES
+#+BEGIN_SRC snakemake
+SAMPLES, = glob_wildcards(join_path(config['data']['reads'], "{sample}" + config.get('read_prefix', '.merged.fastq')))
+#+END_SRC
+*** RULES
+**** ALL
+#+BEGIN_SRC snakemake
+rule all:
+    input:
+        samples = expand(join_path(config['data']['reads'], "{sample}" + config.get('read_prefix', '.merged.fastq'))),
+        quality_checks = expand(join_path(config['results']['nanaplot'], "{status}", "{sample}"), sample=SAMPLES, status=("raw", "filtered"))
+#+END_SRC
+**** Quality Check raw
+#+BEGIN_SRC snakemake
+rule quality_check_raw:
+    input:
+        sample = join_path(config['data']['reads'], "{sample}" + config.get('read_prefix', '.merged.fastq'))
+    output:
+        quality_checks_dir = directory(join_path(config['results']['nanaplot'], "raw", "{sample}"))
+    conda:
+        'envs/nanoplot_env.yaml'
+    threads:
+        get_cores_perc(0.2)
+    conda:
+        "envs/nanoplot_env.yaml"
+    shell:
+        "NanoPlot -t {threads} --plots dot -o {output.quality_check_dir} --fastq {input.sample}"
+#+END_SRC
+**** Quality check filtered
+#+BEGIN_SRC snakemake
+rule quality_check_filtered:
+    input:
+        sample = join_path(config['data']['reads'], "{sample}" + config.get('read_prefix', '.merged.fastq'))
+    output:
+        quality_checks_dir = directory(join_path(config['results']['nanaplot'], "filtered", "{sample}"))
+    conda:
+        'envs/nanoplot_env.yaml'
+    threads:
+        get_cores_perc(0.2)
+    conda:
+        "envs/nanoplot_env.yaml"
+    shell:
+        "NanoPlot -t {threads} --plots dot -o {output.quality_check_dir} --fastq {input.sample}"
+
+#+END_SRC
+
+
+
 * CONFIGS
 :PROPERTIES:
 :COOKIE_DATA: todo recursive

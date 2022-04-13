@@ -1,15 +1,20 @@
 # [[file:../main.org::*CONFIGS][CONFIGS:1]]
-data: 'data'
-
-# Input
-reads: 'data/fastq'
-parental_phages: 'data/genomes/phage/parental.phage.merged.fasta'
+data:
+  reads: 'data/fastq'
+  parental_phages: 'data/genomes/phage/parental.phage.merged.fasta'
 
 # Outputs
 outputs:
   nanoplot:
     before: 'outputs/nanoplot/before_filter'
     after: 'outputs/nanoplot/after_filter'
+  assemblies:
+    minia: 'outputs/assemblies/minia'
+    miniasm: 'outputs/assemblies/miniasm'
+
+# Outputs
+results:
+  nanoplot: 'outputs/nanoplot'
   assemblies:
     minia: 'outputs/assemblies/minia'
     miniasm: 'outputs/assemblies/miniasm'
