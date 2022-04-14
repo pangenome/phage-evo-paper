@@ -43,7 +43,7 @@ rm -rf .git
 git init && git commit --allow-empty -m "Initial Commit."
 #+END_SRC
 
-* TODO README.md [25%]
+* README.md
 #+NAME: cb:README.md
 #+CAPTION: README.md
 #+BEGIN_SRC markdown :tangle README.md
@@ -55,7 +55,7 @@ A Snakemake workflow for `Phage directed evolution analysis`.
 #+END_SRC
 ** DONE Create README.md
 ** TODO Create linter action
-* DONE Snakefile [0%]
+* Snakefile
 :PROPERTIES:
 :COOKIE_DATA: todo recursive
 :header-args: :tangle workflow/Snakefile :mkdirp yes :exports none :eval never-export :comments link
@@ -81,24 +81,42 @@ get_Kbs = lambda x: int(x/1_000)
 
 ** GLOBAL VARIABLES
 #+BEGIN_SRC snakemake
-output_dirs = config['outputs']
-snakefile_path = os.path.dirname(workflow.snakefile)
-SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
+# output_dirs = config['outputs']
+# snakefile_path = os.path.dirname(workflow.snakefile)
+# SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
 
-# Prefixes
+# # Prefixes
 minia_prefix="outputs/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
-pggb_prefix=".p{}.s{}.n{}".format(*itget("map-pct-id", "n-mappings","segment-length")(config['params']['pggb']))
-# Suffixes
+# pggb_prefix=".p{}.s{}.n{}".format(*itget("map-pct-id", "n-mappings","segment-length")(config['params']['pggb']))
+# # Suffixes
 filter_contigs_prefix = minia_prefix + '.min{}Kb.max{}Kb'.format(*iter(map(get_Kbs, itget('min_contig_lenght', 'max_contig_lenght')(config['params']['minia']))))
 #+END_SRC
+** MAIN RULE ALL
+#+BEGIN_SRC snakemake
+rule all:
+    input:
+        minimap2_bam = join_path('results', 'map_reads', 'minia_assembly_X_bacterial_genome.bam')
+#+END_SRC
 
-** RULES
+** Include
+#+BEGIN_SRC snakemake
+include:
+  #  'rules/main.smk'
+    'rules/parental_genomes_mapping.smk'
+
+#+END_SRC
+
+* Rules
+** Main
+:PROPERTIES:
+:COOKIE_DATA: todo recursive
+:header-args: :tangle workflow/rules/main.smk :mkdirp yes :exports none :eval never-export :comments link
+:END:
 *** ALL
 #+BEGIN_SRC snakemake
 rule all:
     input:
-        nanoplot_out=expand(itget('before','after')(output_dirs['nanoplot'])),
-        pggb_dirs=expand("outputs/pggb/{graph}"+pggb_prefix, graph=("minia"))
+        minimap2_bam = join_path('results', 'map_reads', 'minimap2_bacterial_and_phage_genomes.bam')
 #+END_SRC
 *** Merge reads
 #+BEGIN_SRC snakemake
@@ -228,77 +246,32 @@ rule pggb_minia:
     shell:
         "pggb -i {input.minia_assembly_polished_filtered} -p {params.map-pct-id} -n {params.n-mappings} -s {params.segment-length} -t {threads} -o {output} -m"
 #+END_SRC
-* Modules
 ** Parental Genomes Mapping
 :PROPERTIES:
 :COOKIE_DATA: todo recursive
 :header-args: :tangle workflow/rules/parental_genomes_mapping.smk :mkdirp yes :exports none :eval never-export :comments link
 :END:
-*** IMPORTS
-#+BEGIN_SRC snakemake
-import os
-import sys
-from operator import itemgetter as itget
-#+END_SRC
 
-*** FILE CONFIGS
-#+BEGIN_SRC snakemake
-configfile: 'config/config.yaml'
-#+END_SRC
+Objective: Minia assembly > map reads parental / bacteria > remove 100 bacteiral genes > quant chmerical reads
 
-*** FUNCTIONS
+*** Map reads to minia assembly
 #+BEGIN_SRC snakemake
-get_cores_perc = lambda perc: max(1, workflow.cores * perc)
-join_path = lambda *args: os.path.join(*args)
-get_Kbs = lambda x: int(x/1_000)
-#+END_SRC
-
-*** GLOBAL VARIABLES
-#+BEGIN_SRC snakemake
-SAMPLES, = glob_wildcards(join_path(config['data']['reads'], "{sample}" + config.get('read_prefix', '.merged.fastq')))
-#+END_SRC
-*** RULES
-**** ALL
-#+BEGIN_SRC snakemake
-rule all:
+rule map_minia_assembly_on_bacterial:
     input:
-        samples = expand(join_path(config['data']['reads'], "{sample}" + config.get('read_prefix', '.merged.fastq'))),
-        quality_checks = expand(join_path(config['results']['nanaplot'], "{status}", "{sample}"), sample=SAMPLES, status=("raw", "filtered"))
-#+END_SRC
-**** Quality Check raw
-#+BEGIN_SRC snakemake
-rule quality_check_raw:
-    input:
-        sample = join_path(config['data']['reads'], "{sample}" + config.get('read_prefix', '.merged.fastq'))
+        minia_assembly_polished_filtered = minia_prefix + '.contigs.polished' + '.fa',
+        bacterial_genome = config['data']['genomes']['ecoli']
     output:
-        quality_checks_dir = directory(join_path(config['results']['nanaplot'], "raw", "{sample}"))
+        minimap2_bam = join_path('results', 'map_reads', 'minia_assembly_X_bacterial_genome.bam')
     conda:
-        'envs/nanoplot_env.yaml'
+        'envs/miniasm.yaml'
     threads:
-        get_cores_perc(0.2)
-    conda:
-        "envs/nanoplot_env.yaml"
+        get_cores_perc(1)
     shell:
-        "NanoPlot -t {threads} --plots dot -o {output.quality_check_dir} --fastq {input.sample}"
+        """
+        minimap2 -t {threads} -ax map-ont {input.bacterial_genome} {input.minia_assembly_polished_filtered} \
+            | samtools view -b - > {output.minimap2_bam}
+        """
 #+END_SRC
-**** Quality check filtered
-#+BEGIN_SRC snakemake
-rule quality_check_filtered:
-    input:
-        sample = join_path(config['data']['reads'], "{sample}" + config.get('read_prefix', '.merged.fastq'))
-    output:
-        quality_checks_dir = directory(join_path(config['results']['nanaplot'], "filtered", "{sample}"))
-    conda:
-        'envs/nanoplot_env.yaml'
-    threads:
-        get_cores_perc(0.2)
-    conda:
-        "envs/nanoplot_env.yaml"
-    shell:
-        "NanoPlot -t {threads} --plots dot -o {output.quality_check_dir} --fastq {input.sample}"
-
-#+END_SRC
-
 
 
 * CONFIGS
@@ -307,11 +280,18 @@ rule quality_check_filtered:
 :header-args: :tangle config/config.yaml :mkdirp yes :exports none :eval never-export :comments link
 :END:
 #+BEGIN_SRC yaml
-data: 'data'
+# data: 'data'
 
-# Input
-reads: 'data/fastq'
-parental_phages: 'data/genomes/phage/parental.phage.merged.fasta'
+# # Input
+# reads: 'data/fastq'
+# parental_phages: 'data/genomes/phage/parental.phage.merged.fasta'
+
+data:
+  reads: 'data/fastq'
+  genomes:
+    ecoli: 'data/genomes/bacteria/E_coli_bl21_noplasmid.fasta'
+    bacteira: 'data/genomes/bacteria'
+    phages: 'data/genomes/phage'
 
 # Outputs
 outputs:
