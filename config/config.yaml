@@ -9,6 +9,7 @@ data:
   reads: 'data/fastq'
   genomes:
     ecoli: 'data/genomes/bacteria/E_coli_bl21_noplasmid.fasta'
+    merged: 'data/genomes/bacteria/parental_phages_and_Ecoli_bl21.fasta'
     bacteira: 'data/genomes/bacteria'
     phages: 'data/genomes/phage'
 
@@ -22,6 +23,7 @@ outputs:
     miniasm: 'outputs/assemblies/miniasm'
 
 # PARAMETERS
+results: 'results'
 
 # minia
 params:

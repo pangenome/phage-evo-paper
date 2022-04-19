@@ -31,8 +31,7 @@ SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fa
 # [[file:../main.org::*MAIN RULE ALL][MAIN RULE ALL:1]]
 rule all:
     input:
-        samples=expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
-        samples_prefixed=join_path(config['data']['reads'], 'P1-10.merged.prefixed.fastq')
+        all_reads_sam = join_path(config['data']['reads'], 'P1-10.merged.prefixed_X_genomes.sam'),
 # MAIN RULE ALL:1 ends here
 
 # [[file:../main.org::*Include][Include:1]]
