@@ -1,11 +1,18 @@
 # [[file:../../main.org::*Map reads to minia assembly][Map reads to minia assembly:1]]
 rule prefix_fastq:
     input:
-        sample=join_path(config['data']['reads'], '{sample}.merged.fastq'),
+        samples=expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
     output:
-        sample_prefixed=join_path(config['data']['reads'], '{sample}.merged.prefixed.fastq')
+        samples_prefixed=join_path(config['data']['reads'], 'P1-10.merged.prefixed.fastq')
     threads:
         1
     shell:
-        "sed -r '/^@/ s/^@/@{wildcards.sample}#1#/' {input.sample} > {output.sample_prefixed}"
+        """
+        echo {input.samples} \
+            | tr ' ' '\\n' \
+            | while read sample; do
+                prefix=$( basename $sample | cut -d'.' -f1)
+                sed -r '/^@.+runid/ s/^@/@'$prefix'#1#/' $sample >> {output.samples_prefixed}
+            done
+        """
 # Map reads to minia assembly:1 ends here
