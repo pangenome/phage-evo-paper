@@ -86,16 +86,19 @@ get_Kbs = lambda x: int(x/1_000)
 # SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
 
 # # Prefixes
-minia_prefix="outputs/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
+# minia_prefix="outputs/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
 # pggb_prefix=".p{}.s{}.n{}".format(*itget("map-pct-id", "n-mappings","segment-length")(config['params']['pggb']))
 # # Suffixes
-filter_contigs_prefix = minia_prefix + '.min{}Kb.max{}Kb'.format(*iter(map(get_Kbs, itget('min_contig_lenght', 'max_contig_lenght')(config['params']['minia']))))
+# filter_contigs_prefix = minia_prefix + '.min{}Kb.max{}Kb'.format(*iter(map(get_Kbs, itget('min_contig_lenght', 'max_contig_lenght')(config['params']['minia']))))
+
+SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fastq'))
 #+END_SRC
 ** MAIN RULE ALL
 #+BEGIN_SRC snakemake
 rule all:
     input:
-        minimap2_bam = join_path('results', 'map_reads', 'minia_assembly_X_bacterial_genome.bam')
+        samples=expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
+        samples_prefixed=expand(join_path(config['data']['reads'], '{sample}.merged.prefixed.fastq'), sample=SAMPLES)
 #+END_SRC
 
 ** Include
@@ -256,21 +259,15 @@ Objective: Minia assembly > map reads parental / bacteria > remove 100 bacteiral
 
 *** Map reads to minia assembly
 #+BEGIN_SRC snakemake
-rule map_minia_assembly_on_bacterial:
+rule prefix_fastq:
     input:
-        minia_assembly_polished_filtered = minia_prefix + '.contigs.polished' + '.fa',
-        bacterial_genome = config['data']['genomes']['ecoli']
+        sample=join_path(config['data']['reads'], '{sample}.merged.fastq'),
     output:
-        minimap2_bam = join_path('results', 'map_reads', 'minia_assembly_X_bacterial_genome.bam')
-    conda:
-        'envs/miniasm.yaml'
+        sample_prefixed=join_path(config['data']['reads'], '{sample}.merged.prefixed.fastq')
     threads:
-        get_cores_perc(1)
+        1
     shell:
-        """
-        minimap2 -t {threads} -ax map-ont {input.bacterial_genome} {input.minia_assembly_polished_filtered} \
-            | samtools view -b - > {output.minimap2_bam}
-        """
+        "sed -r '/^@/ s/^@/@{wildcards.sample}#1#/' {input.sample} > {output.sample_prefixed}"
 #+END_SRC
 
 
