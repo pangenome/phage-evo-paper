@@ -81,12 +81,12 @@ get_Kbs = lambda x: int(x/1_000)
 
 ** GLOBAL VARIABLES
 #+BEGIN_SRC snakemake
-output_dirs = config['outputs']
+output_dirs = config['results']
 snakefile_path = os.path.dirname(workflow.snakefile)
 # SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
 
 # Prefixes
-minia_prefix="outputs/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
+minia_prefix="results/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
 pggb_prefix=".p{}.s{}.l{}".format(*itget("map_pct_id", "segment_length", "block_length")(config['params']['pggb']))
 
 # Suffixes
@@ -98,7 +98,8 @@ SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fa
 #+BEGIN_SRC snakemake
 rule all:
     input:
-        samples_prefixed_gzipped=expand(join_path(config['data']['reads'], 'P1-10.merged.prefixed.{state}.fastq.gz'), state=('before', 'after'))
+        nanoplot = expand("results/nanoplot/{state}_filter", state=('before', 'after')),
+        pggb_dir='results/pggb/minia' + pggb_prefix,
 #+END_SRC
 
 ** Include
@@ -116,16 +117,6 @@ include:
 :header-args: :tangle workflow/rules/assembly_merged_reads.smk :mkdirp yes :exports none :eval never-export :comments link
 :END:
 *** Merge reads
-#+BEGIN_SRC snakemake
-# rule merged_reads:
-#     input:
-#         expand(config['reads']+'/{sample}.fastq', sample=SAMPLES)
-#     output:
-#         config['data']+'/merged.before.filtering.fastq'
-#     shell:
-#         "cat {input} > {output}"
-#+END_SRC
-*** Map reads to minia assembly
 #+BEGIN_SRC snakemake
 rule prefix_fastq:
     input:
@@ -155,7 +146,7 @@ rule nanoplot:
     input:
         samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.{state}_qc.fastq.gz'),
     output:
-        directory("outputs/nanoplot/{state}_filter")
+        directory("results/nanoplot/{state}_filter")
     threads:
         get_cores_perc(0.5)
     conda:
@@ -231,7 +222,7 @@ rule polishing_graphaligner_minia:
         dbtype = "vg",
         seed_minimizer = 15
     shell:
-        "GraphAligner -g {input.minia_assembly_gfa} -f {input.raw_reads} -x {params.dbtype} --threads {threads} --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minia_gaf} --corrected-out {output.minia_assembly_gfa_polished}"
+        "GraphAligner -g {input.minia_assembly_gfa} -f {input.samples_prefixed_gzipped} -x {params.dbtype} --threads {threads} --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minia_gaf} --corrected-out {output.minia_assembly_gfa_polished}"
 #+END_SRC
 
 *** Filter by length
@@ -264,7 +255,7 @@ rule create_index_fasta:
     conda:
         'envs/pggb_env.yaml'
     shell:
-        "cat {input.minia_assembly_polished_filtered} | bzip -@ {threads} > {output.minia_assembly_polished_filtered_crompressed}"
+        "cat {input.minia_assembly_polished_filtered} | bzip -@ {threads} > {output.minia_assembly_polished_filtered_crompressed} && "
         "samtools faidx {output.minia_assembly_polished_filtered_crompressed}"
 #+END_SRC
 
@@ -285,7 +276,7 @@ rule pggb_minia:
         fai = filter_contigs_prefix + '.contigs.polished.fa.gz.fai',
         gzi = filter_contigs_prefix + '.contigs.polished.fa.gz.gzi',
     output:
-        directory("outputs/pggb/minia"+pggb_prefix),
+        directory("results/pggb/minia"+pggb_prefix),
     params:
         ,**config['params']['pggb']
     conda:
@@ -293,8 +284,8 @@ rule pggb_minia:
     threads:
         get_cores_perc(1)
     shell:
-        "n_mappings=$( grep -c '>' {input.minia_assembly_polished_filtered_crompressed} )" # get number of genomes
-        "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_lengt} -t {threads} -o {output} -i {input.minia_assembly_polished_filtered}"
+        "n_mappings=$( zgrep -c '>' {input.minia_assembly_polished_filtered_crompressed} ) && " # get number of genomes
+        "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -t {threads} -o {output} -i {input.minia_assembly_polished_filtered_crompressed}"
 #+END_SRC
 ** Assembly each passage
 :PROPERTIES:
@@ -365,17 +356,14 @@ data:
     bacteira: 'data/genomes/bacteria'
     phages: 'data/genomes/phage'
 
-# Outputs
-outputs:
+# Results
+results:
   nanoplot:
-    before: 'outputs/nanoplot/before_filter'
-    after: 'outputs/nanoplot/after_filter'
+    before: 'results/nanoplot/before_filter'
+    after: 'results/nanoplot/after_filter'
   assemblies:
-    minia: 'outputs/assemblies/minia'
-    miniasm: 'outputs/assemblies/miniasm'
-
-# PARAMETERS
-results: 'results'
+    minia: 'results/assemblies/minia'
+    miniasm: 'results/assemblies/miniasm'
 
 # minia
 params:
@@ -385,11 +373,10 @@ params:
     min_contig_lenght: 20_000
     max_contig_lenght: 200_000
   filtlong:
-    keep_percent: 98
-    min_length: 20_000
+    keep_percent: 95
+    min_length: 1_000
   pggb:
     map_pct_id: 90
-    # n_mappings: 100
     segment_length: 1_000
     block_length: 0
 #+END_SRC

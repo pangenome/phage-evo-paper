@@ -13,17 +13,14 @@ data:
     bacteira: 'data/genomes/bacteria'
     phages: 'data/genomes/phage'
 
-# Outputs
-outputs:
+# Results
+results:
   nanoplot:
-    before: 'outputs/nanoplot/before_filter'
-    after: 'outputs/nanoplot/after_filter'
+    before: 'results/nanoplot/before_filter'
+    after: 'results/nanoplot/after_filter'
   assemblies:
-    minia: 'outputs/assemblies/minia'
-    miniasm: 'outputs/assemblies/miniasm'
-
-# PARAMETERS
-results: 'results'
+    minia: 'results/assemblies/minia'
+    miniasm: 'results/assemblies/miniasm'
 
 # minia
 params:
@@ -33,11 +30,10 @@ params:
     min_contig_lenght: 20_000
     max_contig_lenght: 200_000
   filtlong:
-    keep_percent: 98
-    min_length: 20_000
+    keep_percent: 95
+    min_length: 1_000
   pggb:
     map_pct_id: 90
-    # n_mappings: 100
     segment_length: 1_000
     block_length: 0
 # CONFIGS:1 ends here
