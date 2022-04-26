@@ -3,7 +3,7 @@ rule prefix_fastq:
     input:
         samples=expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
     params:
-        samples_prefixed=join_path(config['data']['reads'], 'P1-10.merged.prefixed.fastq')
+        samples_prefixed = join_path(config['data']['reads'], 'P1-10.merged.prefixed.before_qc.fastq'),
     output:
         samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.before_qc.fastq.gz'),
     threads:
@@ -16,7 +16,7 @@ rule prefix_fastq:
                 prefix=$( basename $sample | cut -d'.' -f1)
                 sed -r '/^@.+runid/ s/^@/@'$prefix'#1#/' $sample >> {params.samples_prefixed}
             done
-        cat {params.samples_prefixed} | pigz -p {threads} > {output.samples_prefixed_gzipped}
+        pigz -p {threads} {params.samples_prefixed}
         """
 # Merge reads:1 ends here
 
@@ -29,7 +29,7 @@ rule nanoplot:
     threads:
         get_cores_perc(0.5)
     conda:
-        "envs/nanoplot_env.yaml"
+        "../envs/nanoplot_env.yaml"
     shell:
         "NanoPlot -t {threads} --plots dot -o {output} --fastq {input}"
 # NANOPLOT:1 ends here
@@ -43,9 +43,11 @@ rule filter_reads:
     params:
         **config['params']['filtlong']
     conda:
-        "envs/filtlong_env.yaml"
+        "../envs/filtlong_env.yaml"
+    threads:
+        get_cores_perc(0.2)
     shell:
-        "filtlong --min_length {params.min_length} --keep_percent {params.keep_percent} {input} > {output} "
+        "filtlong --min_length {params.min_length} --keep_percent {params.keep_percent} {input} | pigz -p {threads} > {output}"
 # FILTER READS:1 ends here
 
 # [[file:../../main.org::*MINIA3][MINIA3:1]]
@@ -55,12 +57,12 @@ rule minia:
     output:
         minia_assembly=minia_prefix+".contigs.fa"
     threads:
-        get_cores_perc(0.5)
+        get_cores_perc(1)
     params:
         **config['params']['minia'],
         prefix_fasta=minia_prefix
     conda:
-        'envs/minia_env.yaml'
+        '../envs/minia_env.yaml'
     shell:
         "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out {params.prefix_fasta} -in {input}"
 # MINIA3:1 ends here
@@ -75,7 +77,7 @@ rule minia_fasta_to_gfa:
     params:
         **config['params']['minia'],
     conda:
-        'envs/minia_env.yaml'
+        '../envs/minia_env.yaml'
     shell:
         "python {input.script} {input.minia_assembly} {output.minia_assembly_gfa} {params.kmer}"
 # FASTA_TO_GFA:1 ends here
@@ -83,9 +85,10 @@ rule minia_fasta_to_gfa:
 # [[file:../../main.org::*Graphaligner MINIA][Graphaligner MINIA:1]]
 rule polishing_graphaligner_minia:
     conda:
-        'envs/graphaligner_env.yaml'
+        '../envs/graphaligner_env.yaml'
     input:
-        samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.before_qc.fastq.gz'),
+        # samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.before_qc.fastq.gz'),
+        samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.after_qc.fastq.gz'),
         minia_assembly_gfa=minia_prefix+'.contigs.gfa'
     output:
         minia_gaf=minia_prefix+'.contigs.gaf',
@@ -109,7 +112,7 @@ rule filter_by_length:
     params:
         **config['params']['minia']
     conda:
-        'envs/bio_env.yaml'
+        '../envs/bio_env.yaml'
     shell:
         "python3 {input.script} {params.min_contig_lenght}  {params.max_contig_lenght} > {output.minia_assembly_polished_filtered}"
 # Filter by length:1 ends here
@@ -125,7 +128,7 @@ rule create_index_fasta:
     threads:
         get_cores_perc(0.5)
     conda:
-        'envs/pggb_env.yaml'
+        '../envs/pggb_env.yaml'
     shell:
         "cat {input.minia_assembly_polished_filtered} | bzip -@ {threads} > {output.minia_assembly_polished_filtered_crompressed} && "
         "samtools faidx {output.minia_assembly_polished_filtered_crompressed}"
@@ -136,21 +139,21 @@ rule create_index_fasta:
 #     input:
 # Get sample and add parental phages genomes:1 ends here
 
-# [[file:../../main.org::*PGGB minia_polished][PGGB minia_polished:1]]
-rule pggb_minia:
-    input:
-        minia_assembly_polished_filtered_crompressed = filter_contigs_prefix + '.contigs.polished.fa.gz',
-        fai = filter_contigs_prefix + '.contigs.polished.fa.gz.fai',
-        gzi = filter_contigs_prefix + '.contigs.polished.fa.gz.gzi',
-    output:
-        directory("results/pggb/minia"+pggb_prefix),
-    params:
-        **config['params']['pggb']
-    conda:
-        'envs/pggb_env.yaml'
-    threads:
-        get_cores_perc(1)
-    shell:
-        "n_mappings=$( zgrep -c '>' {input.minia_assembly_polished_filtered_crompressed} ) && " # get number of genomes
-        "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -t {threads} -o {output} -i {input.minia_assembly_polished_filtered_crompressed}"
-# PGGB minia_polished:1 ends here
+# # [[file:../../main.org::*PGGB minia_polished][PGGB minia_polished:1]]
+# rule pggb_minia:
+#     input:
+#         minia_assembly_polished_filtered_crompressed = filter_contigs_prefix + '.contigs.polished.fa.gz',
+#         fai = filter_contigs_prefix + '.contigs.polished.fa.gz.fai',
+#         gzi = filter_contigs_prefix + '.contigs.polished.fa.gz.gzi',
+#     output:
+#         directory("results/pggb/minia"+pggb_prefix),
+#     params:
+#         **config['params']['pggb']
+#     conda:
+#         '../envs/pggb_env.yaml'
+#     threads:
+#         get_cores_perc(1)
+#     shell:
+#         "n_mappings=$( zgrep -c '>' {input.minia_assembly_polished_filtered_crompressed} ) && " # get number of genomes
+#         "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -t {threads} -o {output} -i {input.minia_assembly_polished_filtered_crompressed}"
+# # PGGB minia_polished:1 ends here
