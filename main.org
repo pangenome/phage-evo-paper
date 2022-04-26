@@ -81,15 +81,16 @@ get_Kbs = lambda x: int(x/1_000)
 
 ** GLOBAL VARIABLES
 #+BEGIN_SRC snakemake
-# output_dirs = config['outputs']
-# snakefile_path = os.path.dirname(workflow.snakefile)
+output_dirs = config['outputs']
+snakefile_path = os.path.dirname(workflow.snakefile)
 # SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
 
-# # Prefixes
-# minia_prefix="outputs/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
-# pggb_prefix=".p{}.s{}.n{}".format(*itget("map-pct-id", "n-mappings","segment-length")(config['params']['pggb']))
-# # Suffixes
-# filter_contigs_prefix = minia_prefix + '.min{}Kb.max{}Kb'.format(*iter(map(get_Kbs, itget('min_contig_lenght', 'max_contig_lenght')(config['params']['minia']))))
+# Prefixes
+minia_prefix="outputs/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
+pggb_prefix=".p{}.s{}.l{}".format(*itget("map_pct_id", "segment_length", "block_length")(config['params']['pggb']))
+
+# Suffixes
+filter_contigs_prefix = minia_prefix + '.min{}Kb.max{}Kb'.format(*iter(map(get_Kbs, itget('min_contig_lenght', 'max_contig_lenght')(config['params']['minia']))))
 
 SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fastq'))
 #+END_SRC
@@ -97,38 +98,54 @@ SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fa
 #+BEGIN_SRC snakemake
 rule all:
     input:
-        all_reads_sam = join_path(config['data']['reads'], 'P1-10.merged.prefixed_X_genomes.sam'),
+        samples_prefixed_gzipped=expand(join_path(config['data']['reads'], 'P1-10.merged.prefixed.{state}.fastq.gz'), state=('before', 'after'))
 #+END_SRC
 
 ** Include
 #+BEGIN_SRC snakemake
 include:
-  #  'rules/main.smk'
-    'rules/parental_genomes_mapping.smk'
+    'rules/assembly_merged_reads.smk'
+    # 'rules/assembly_each_passage_reads.smk'
 
 #+END_SRC
 
 * Rules
-** Main
+** Merging all reads
 :PROPERTIES:
 :COOKIE_DATA: todo recursive
-:header-args: :tangle workflow/rules/main.smk :mkdirp yes :exports none :eval never-export :comments link
+:header-args: :tangle workflow/rules/assembly_merged_reads.smk :mkdirp yes :exports none :eval never-export :comments link
 :END:
-*** ALL
-#+BEGIN_SRC snakemake
-rule all:
-    input:
-        minimap2_bam = join_path('results', 'map_reads', 'minimap2_bacterial_and_phage_genomes.bam')
-#+END_SRC
 *** Merge reads
 #+BEGIN_SRC snakemake
-rule merged_reads:
+# rule merged_reads:
+#     input:
+#         expand(config['reads']+'/{sample}.fastq', sample=SAMPLES)
+#     output:
+#         config['data']+'/merged.before.filtering.fastq'
+#     shell:
+#         "cat {input} > {output}"
+#+END_SRC
+*** Map reads to minia assembly
+#+BEGIN_SRC snakemake
+rule prefix_fastq:
     input:
-        expand(config['reads']+'/{sample}.fastq', sample=SAMPLES)
+        samples=expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
+    params:
+        samples_prefixed=join_path(config['data']['reads'], 'P1-10.merged.prefixed.fastq')
     output:
-        config['data']+'/merged.before.filtering.fastq'
+        samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.before_qc.fastq.gz'),
+    threads:
+        get_cores_perc(1)
     shell:
-        "cat {input} > {output}"
+        """
+        echo {input.samples} \
+            | tr ' ' '\\n' \
+            | while read sample; do
+                prefix=$( basename $sample | cut -d'.' -f1)
+                sed -r '/^@.+runid/ s/^@/@'$prefix'#1#/' $sample >> {params.samples_prefixed}
+            done
+        cat {params.samples_prefixed} | pigz -p {threads} > {output.samples_prefixed_gzipped}
+        """
 #+END_SRC
 
 *** NANOPLOT
@@ -136,9 +153,9 @@ Get some quality check data (mostly read length distribution):
 #+BEGIN_SRC snakemake
 rule nanoplot:
     input:
-        config['data']+"/merged.{status}.filtering.fastq"
+        samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.{state}_qc.fastq.gz'),
     output:
-        directory("outputs/nanoplot/{status}_filter")
+        directory("outputs/nanoplot/{state}_filter")
     threads:
         get_cores_perc(0.5)
     conda:
@@ -151,9 +168,9 @@ rule nanoplot:
 #+BEGIN_SRC snakemake
 rule filter_reads:
     input:
-        config['data']+'/merged.before.filtering.fastq'
+        samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.before_qc.fastq.gz'),
     output:
-        config['data']+'/merged.after.filtering.fastq'
+        samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.after_qc.fastq.gz'),
     params:
         **config['params']['filtlong']
     conda:
@@ -167,7 +184,7 @@ Genome assembly with [[https:https://github.com/GATB/minia][minia3]]:
 #+BEGIN_SRC snakemake
 rule minia:
     input:
-        config['data']+'/merged.after.filtering.fastq'
+        samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.after_qc.fastq.gz'),
     output:
         minia_assembly=minia_prefix+".contigs.fa"
     threads:
@@ -203,7 +220,7 @@ rule polishing_graphaligner_minia:
     conda:
         'envs/graphaligner_env.yaml'
     input:
-        raw_reads=config['data']+'/merged.before.filtering.fastq',
+        samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.before_qc.fastq.gz'),
         minia_assembly_gfa=minia_prefix+'.contigs.gfa'
     output:
         minia_gaf=minia_prefix+'.contigs.gaf',
@@ -224,7 +241,7 @@ rule filter_by_length:
         minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.fa',
         script = join_path(snakefile_path, 'scripts', 'filter_by_length.py')
     output:
-        minia_assembly_polished_filtered = minia_prefix + '.contigs.polished' + filter_contigs_prefix + '.fa'
+        minia_assembly_polished_filtered = filter_contigs_prefix + '.contigs.polished.fa'
     params:
         **config['params']['minia']
     conda:
@@ -232,30 +249,58 @@ rule filter_by_length:
     shell:
         "python3 {input.script} {params.min_contig_lenght}  {params.max_contig_lenght} > {output.minia_assembly_polished_filtered}"
 #+END_SRC
+
+*** Create index
+#+BEGIN_SRC snakemake
+rule create_index_fasta:
+    input:
+        minia_assembly_polished_filtered = filter_contigs_prefix + '.contigs.polished.fa',
+    output:
+        minia_assembly_polished_filtered_crompressed = filter_contigs_prefix + '.contigs.polished.fa.gz',
+        fai = filter_contigs_prefix + '.contigs.polished.fa.gz.fai',
+        gzi = filter_contigs_prefix + '.contigs.polished.fa.gz.gzi',
+    threads:
+        get_cores_perc(0.5)
+    conda:
+        'envs/pggb_env.yaml'
+    shell:
+        "cat {input.minia_assembly_polished_filtered} | bzip -@ {threads} > {output.minia_assembly_polished_filtered_crompressed}"
+        "samtools faidx {output.minia_assembly_polished_filtered_crompressed}"
+#+END_SRC
+
+*** Get sample and add parental phages genomes
+#+BEGIN_SRC snakemake
+# rule add_parental_genomes_and_get_sample:
+#     input:
+
+
+
+#+END_SRC
+
 *** PGGB minia_polished
 #+BEGIN_SRC snakemake
 rule pggb_minia:
     input:
-        minia_assembly_polished_filtered = minia_prefix + '.contigs.polished' + filter_contigs_prefix + '.fa'
+        minia_assembly_polished_filtered_crompressed = filter_contigs_prefix + '.contigs.polished.fa.gz',
+        fai = filter_contigs_prefix + '.contigs.polished.fa.gz.fai',
+        gzi = filter_contigs_prefix + '.contigs.polished.fa.gz.gzi',
     output:
-        directory("outputs/pggb/minia"+pggb_prefix)
+        directory("outputs/pggb/minia"+pggb_prefix),
     params:
-        **config['params']['pggb']
+        ,**config['params']['pggb']
     conda:
         'envs/pggb_env.yaml'
     threads:
-        get_cores_perc(0.5)
+        get_cores_perc(1)
     shell:
-        "pggb -i {input.minia_assembly_polished_filtered} -p {params.map-pct-id} -n {params.n-mappings} -s {params.segment-length} -t {threads} -o {output} -m"
+        "n_mappings=$( grep -c '>' {input.minia_assembly_polished_filtered_crompressed} )" # get number of genomes
+        "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_lengt} -t {threads} -o {output} -i {input.minia_assembly_polished_filtered}"
 #+END_SRC
-** Parental Genomes Mapping
+** Assembly each passage
 :PROPERTIES:
 :COOKIE_DATA: todo recursive
-:header-args: :tangle workflow/rules/parental_genomes_mapping.smk :mkdirp yes :exports none :eval never-export :comments link
+:header-args: :tangle workflow/rules/assembly_each_passage_reads.smk :mkdirp yes :exports none :eval never-export :comments link
 :END:
-
-Objective: Minia assembly > map reads parental / bacteria > remove 100 bacteiral genes > quant chmerical reads
-
 *** Map reads to minia assembly
 #+BEGIN_SRC snakemake
 rule prefix_fastq:
@@ -287,15 +332,18 @@ rule minimap2_map_reads_to_refs:
         samples_prefixed_gzipped = join_path(config['data']['reads'], 'P1-10.merged.prefixed.fastq.gz'),
     output:
         all_reads_sam = join_path(config['data']['reads'], 'P1-10.merged.prefixed_X_genomes.sam'),
+    params:
+        bacteria
     threads:
         get_cores_perc(1)
     conda:
         '../envs/minimap2_env.yaml'
     shell:
-        "minimap2 -ax map-pb -t {threads} {input.target} {input.samples_prefixed_gzipped} > {output.all_reads_sam}"
+        "minimap2 -L -ax map-ont -t {threads} {input.target} {input.samples_prefixed_gzipped} | {output.all_reads_sam} "
 
 
 #+END_SRC
+**** TODO add samtools to minimap2 env
 
 * CONFIGS
 :PROPERTIES:
@@ -340,10 +388,10 @@ params:
     keep_percent: 98
     min_length: 20_000
   pggb:
-    map-pct-id: 90
-    n-mappings: 100
-    segment-length: 1_000
-
+    map_pct_id: 90
+    # n_mappings: 100
+    segment_length: 1_000
+    block_length: 0
 #+END_SRC
 * ENVS
 :PROPERTIES:

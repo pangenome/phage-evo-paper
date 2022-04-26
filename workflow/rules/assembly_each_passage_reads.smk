@@ -27,10 +27,12 @@ rule minimap2_map_reads_to_refs:
         samples_prefixed_gzipped = join_path(config['data']['reads'], 'P1-10.merged.prefixed.fastq.gz'),
     output:
         all_reads_sam = join_path(config['data']['reads'], 'P1-10.merged.prefixed_X_genomes.sam'),
+    params:
+        bacteria
     threads:
         get_cores_perc(1)
     conda:
         '../envs/minimap2_env.yaml'
     shell:
-        "minimap2 -ax map-pb -t {threads} {input.target} {input.samples_prefixed_gzipped} > {output.all_reads_sam}"
+        "minimap2 -L -ax map-ont -t {threads} {input.target} {input.samples_prefixed_gzipped} | {output.all_reads_sam} "
 # Filter out bacterial reads:1 ends here
