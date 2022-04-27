@@ -99,7 +99,7 @@ SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fa
 rule all:
     input:
         nanoplot = expand("results/nanoplot/{state}_filter", state=('before', 'after')),
-        pggb_dir='results/pggb/minia' + pggb_prefix,
+        pggb_dir = "results/pggb/minia.assembly" + pggb_prefix + ".ecoli.and.phages"
 #+END_SRC
 
 ** Include
@@ -107,7 +107,6 @@ rule all:
 include:
     'rules/assembly_merged_reads.smk'
     # 'rules/assembly_each_passage_reads.smk'
-
 #+END_SRC
 
 * Rules
@@ -122,7 +121,7 @@ rule prefix_fastq:
     input:
         samples=expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
     params:
-        samples_prefixed=join_path(config['data']['reads'], 'P1-10.merged.prefixed.fastq')
+        samples_prefixed = join_path(config['data']['reads'], 'P1-10.merged.prefixed.before_qc.fastq'),
     output:
         samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.before_qc.fastq.gz'),
     threads:
@@ -135,7 +134,7 @@ rule prefix_fastq:
                 prefix=$( basename $sample | cut -d'.' -f1)
                 sed -r '/^@.+runid/ s/^@/@'$prefix'#1#/' $sample >> {params.samples_prefixed}
             done
-        cat {params.samples_prefixed} | pigz -p {threads} > {output.samples_prefixed_gzipped}
+        pigz -p {threads} {params.samples_prefixed}
         """
 #+END_SRC
 
@@ -150,7 +149,7 @@ rule nanoplot:
     threads:
         get_cores_perc(0.5)
     conda:
-        "envs/nanoplot_env.yaml"
+        "../envs/nanoplot_env.yaml"
     shell:
         "NanoPlot -t {threads} --plots dot -o {output} --fastq {input}"
 #+END_SRC
@@ -165,9 +164,11 @@ rule filter_reads:
     params:
         **config['params']['filtlong']
     conda:
-        "envs/filtlong_env.yaml"
+        "../envs/filtlong_env.yaml"
+    threads:
+        get_cores_perc(0.2)
     shell:
-        "filtlong --min_length {params.min_length} --keep_percent {params.keep_percent} {input} > {output} "
+        "filtlong --min_length {params.min_length} --keep_percent {params.keep_percent} {input} | pigz -p {threads} > {output}"
 #+END_SRC
 
 *** MINIA3
@@ -179,12 +180,12 @@ rule minia:
     output:
         minia_assembly=minia_prefix+".contigs.fa"
     threads:
-        get_cores_perc(0.5)
+        get_cores_perc(1)
     params:
         **config['params']['minia'],
         prefix_fasta=minia_prefix
     conda:
-        'envs/minia_env.yaml'
+        '../envs/minia_env.yaml'
     shell:
         "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min {params.abundance} -out {params.prefix_fasta} -in {input}"
 #+END_SRC
@@ -200,7 +201,7 @@ rule minia_fasta_to_gfa:
     params:
         **config['params']['minia'],
     conda:
-        'envs/minia_env.yaml'
+        '../envs/minia_env.yaml'
     shell:
         "python {input.script} {input.minia_assembly} {output.minia_assembly_gfa} {params.kmer}"
 #+END_SRC
@@ -209,9 +210,10 @@ rule minia_fasta_to_gfa:
 #+BEGIN_SRC snakemake
 rule polishing_graphaligner_minia:
     conda:
-        'envs/graphaligner_env.yaml'
+        '../envs/graphaligner_env.yaml'
     input:
-        samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.before_qc.fastq.gz'),
+        # samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.before_qc.fastq.gz'),
+        samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.after_qc.fastq.gz'),
         minia_assembly_gfa=minia_prefix+'.contigs.gfa'
     output:
         minia_gaf=minia_prefix+'.contigs.gaf',
@@ -229,16 +231,16 @@ rule polishing_graphaligner_minia:
 #+BEGIN_SRC snakemake
 rule filter_by_length:
     input:
-        minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.fa',
+        minia_assembly_gfa_polished = minia_prefix+'.contigs.polished.fa',
         script = join_path(snakefile_path, 'scripts', 'filter_by_length.py')
     output:
         minia_assembly_polished_filtered = filter_contigs_prefix + '.contigs.polished.fa'
     params:
         **config['params']['minia']
     conda:
-        'envs/bio_env.yaml'
+        '../envs/bio_env.yaml'
     shell:
-        "python3 {input.script} {params.min_contig_lenght}  {params.max_contig_lenght} > {output.minia_assembly_polished_filtered}"
+        "python3 {input.script} {input.minia_assembly_gfa_polished} {params.min_contig_lenght}  {params.max_contig_lenght} > {output.minia_assembly_polished_filtered}"
 #+END_SRC
 
 *** Create index
@@ -253,39 +255,55 @@ rule create_index_fasta:
     threads:
         get_cores_perc(0.5)
     conda:
-        'envs/pggb_env.yaml'
+        '../envs/pggb_env.yaml'
     shell:
-        "cat {input.minia_assembly_polished_filtered} | bzip -@ {threads} > {output.minia_assembly_polished_filtered_crompressed} && "
+        "cat {input.minia_assembly_polished_filtered} | bgzip -@ {threads} > {output.minia_assembly_polished_filtered_crompressed} && "
         "samtools faidx {output.minia_assembly_polished_filtered_crompressed}"
 #+END_SRC
 
 *** Get sample and add parental phages genomes
 #+BEGIN_SRC snakemake
-# rule add_parental_genomes_and_get_sample:
-#     input:
-
-
-
+rule add_parental_genomes_and_get_sample:
+    input:
+        minia_assembly_polished_filtered_crompressed = filter_contigs_prefix + '.contigs.polished.fa.gz',
+        parental_genomes = config['data']['genomes']['ecoli_and_phages']
+    params:
+        prefix = filter_contigs_prefix + '.contigs.polished.sample1K.fa',
+    output:
+        minia_assembly_polished_filtered_crompressed_sampled = filter_contigs_prefix + '.contigs.polished.sample1K.fa.gz',
+        fai = filter_contigs_prefix + '.contigs.polished.sample1K.fa.gz.fai',
+        gzi = filter_contigs_prefix + '.contigs.polished.sample1K.fa.gz.gzi',
+    threads:
+        get_cores_perc(0.8)
+    conda:
+        '../envs/pggb_env.yaml'
+    shell:
+        "cat {input.parental_genomes} > {params.prefix} && "
+        "samtools faidx {input.minia_assembly_polished_filtered_crompressed} "
+        "$( seq 1 10 | while read i; do zgrep  -P '^>P'$i'#' minia.k21.a7.min20Kb.max200Kb.contigs.polished.fa.gz | shuf -n 100 ; done | sed 's/>//' ) "
+        "> {params.prefix} && "
+        " bgzip -@ {threads}  {params.prefix} && "
+        " samtools faidx {output.minia_assembly_polished_filtered_crompressed_sampled}"
 #+END_SRC
 
 *** PGGB minia_polished
 #+BEGIN_SRC snakemake
 rule pggb_minia:
     input:
-        minia_assembly_polished_filtered_crompressed = filter_contigs_prefix + '.contigs.polished.fa.gz',
-        fai = filter_contigs_prefix + '.contigs.polished.fa.gz.fai',
-        gzi = filter_contigs_prefix + '.contigs.polished.fa.gz.gzi',
+        minia_assembly_polished_filtered_crompressed_sampled = filter_contigs_prefix + '.contigs.polished.sample1K.fa.gz',
+        fai = filter_contigs_prefix + '.contigs.polished.sample1K.fa.gz.fai',
+        gzi = filter_contigs_prefix + '.contigs.polished.sample1K.fa.gz.gzi',
     output:
-        directory("results/pggb/minia"+pggb_prefix),
+        directory( "results/pggb/minia.assembly" + pggb_prefix + ".ecoli.and.phages" ),
     params:
         ,**config['params']['pggb']
     conda:
-        'envs/pggb_env.yaml'
+        '../envs/pggb_env.yaml'
     threads:
         get_cores_perc(1)
     shell:
-        "n_mappings=$( zgrep -c '>' {input.minia_assembly_polished_filtered_crompressed} ) && " # get number of genomes
-        "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -t {threads} -o {output} -i {input.minia_assembly_polished_filtered_crompressed}"
+        "n_mappings=$( zgrep -c '>' {input.minia_assembly_polished_filtered_crompressed_sampled} ) && "
+        " pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -t {threads} -o {output} -i {input.minia_assembly_polished_filtered_crompressed_sampled}"
 #+END_SRC
 ** Assembly each passage
 :PROPERTIES:
@@ -355,6 +373,7 @@ data:
     merged: 'data/genomes/bacteria/parental_phages_and_Ecoli_bl21.fasta'
     bacteira: 'data/genomes/bacteria'
     phages: 'data/genomes/phage'
+    ecoli_and_phages: 'data/genomes/ecoli_bl21_DE_and_phages_merged.fasta'
 
 # Results
 results:
@@ -376,9 +395,12 @@ params:
     keep_percent: 95
     min_length: 1_000
   pggb:
+    minia_sample_size: 1_000
     map_pct_id: 90
     segment_length: 1_000
     block_length: 0
+
+# Sample genomes from assembly
 #+END_SRC
 * ENVS
 :PROPERTIES:

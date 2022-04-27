@@ -105,7 +105,7 @@ rule polishing_graphaligner_minia:
 # [[file:../../main.org::*Filter by length][Filter by length:1]]
 rule filter_by_length:
     input:
-        minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.fa',
+        minia_assembly_gfa_polished = minia_prefix+'.contigs.polished.fa',
         script = join_path(snakefile_path, 'scripts', 'filter_by_length.py')
     output:
         minia_assembly_polished_filtered = filter_contigs_prefix + '.contigs.polished.fa'
@@ -114,7 +114,7 @@ rule filter_by_length:
     conda:
         '../envs/bio_env.yaml'
     shell:
-        "python3 {input.script} {params.min_contig_lenght}  {params.max_contig_lenght} > {output.minia_assembly_polished_filtered}"
+        "python3 {input.script} {input.minia_assembly_gfa_polished} {params.min_contig_lenght}  {params.max_contig_lenght} > {output.minia_assembly_polished_filtered}"
 # Filter by length:1 ends here
 
 # [[file:../../main.org::*Create index][Create index:1]]
@@ -130,30 +130,49 @@ rule create_index_fasta:
     conda:
         '../envs/pggb_env.yaml'
     shell:
-        "cat {input.minia_assembly_polished_filtered} | bzip -@ {threads} > {output.minia_assembly_polished_filtered_crompressed} && "
+        "cat {input.minia_assembly_polished_filtered} | bgzip -@ {threads} > {output.minia_assembly_polished_filtered_crompressed} && "
         "samtools faidx {output.minia_assembly_polished_filtered_crompressed}"
 # Create index:1 ends here
 
 # [[file:../../main.org::*Get sample and add parental phages genomes][Get sample and add parental phages genomes:1]]
-# rule add_parental_genomes_and_get_sample:
-#     input:
+rule add_parental_genomes_and_get_sample:
+    input:
+        minia_assembly_polished_filtered_crompressed = filter_contigs_prefix + '.contigs.polished.fa.gz',
+        parental_genomes = config['data']['genomes']['ecoli_and_phages']
+    params:
+        prefix = filter_contigs_prefix + '.contigs.polished.sample1K.fa',
+    output:
+        minia_assembly_polished_filtered_crompressed_sampled = filter_contigs_prefix + '.contigs.polished.sample1K.fa.gz',
+        fai = filter_contigs_prefix + '.contigs.polished.sample1K.fa.gz.fai',
+        gzi = filter_contigs_prefix + '.contigs.polished.sample1K.fa.gz.gzi',
+    threads:
+        get_cores_perc(0.8)
+    conda:
+        '../envs/pggb_env.yaml'
+    shell:
+        "cat {input.parental_genomes} > {params.prefix} && "
+        "samtools faidx {input.minia_assembly_polished_filtered_crompressed} "
+        "$( seq 1 10 | while read i; do zgrep  -P '^>P'$i'#' minia.k21.a7.min20Kb.max200Kb.contigs.polished.fa.gz | shuf -n 100 ; done | sed 's/>//' ) "
+        "> {params.prefix} && "
+        " bgzip -@ {threads}  {params.prefix} && "
+        " samtools faidx {output.minia_assembly_polished_filtered_crompressed_sampled}"
 # Get sample and add parental phages genomes:1 ends here
 
-# # [[file:../../main.org::*PGGB minia_polished][PGGB minia_polished:1]]
-# rule pggb_minia:
-#     input:
-#         minia_assembly_polished_filtered_crompressed = filter_contigs_prefix + '.contigs.polished.fa.gz',
-#         fai = filter_contigs_prefix + '.contigs.polished.fa.gz.fai',
-#         gzi = filter_contigs_prefix + '.contigs.polished.fa.gz.gzi',
-#     output:
-#         directory("results/pggb/minia"+pggb_prefix),
-#     params:
-#         **config['params']['pggb']
-#     conda:
-#         '../envs/pggb_env.yaml'
-#     threads:
-#         get_cores_perc(1)
-#     shell:
-#         "n_mappings=$( zgrep -c '>' {input.minia_assembly_polished_filtered_crompressed} ) && " # get number of genomes
-#         "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -t {threads} -o {output} -i {input.minia_assembly_polished_filtered_crompressed}"
-# # PGGB minia_polished:1 ends here
+# [[file:../../main.org::*PGGB minia_polished][PGGB minia_polished:1]]
+rule pggb_minia:
+    input:
+        minia_assembly_polished_filtered_crompressed_sampled = filter_contigs_prefix + '.contigs.polished.sample1K.fa.gz',
+        fai = filter_contigs_prefix + '.contigs.polished.sample1K.fa.gz.fai',
+        gzi = filter_contigs_prefix + '.contigs.polished.sample1K.fa.gz.gzi',
+    output:
+        directory( "results/pggb/minia.assembly" + pggb_prefix + ".ecoli.and.phages" ),
+    params:
+        **config['params']['pggb']
+    conda:
+        '../envs/pggb_env.yaml'
+    threads:
+        get_cores_perc(1)
+    shell:
+        "n_mappings=$( zgrep -c '>' {input.minia_assembly_polished_filtered_crompressed_sampled} ) && "
+        " pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -t {threads} -o {output} -i {input.minia_assembly_polished_filtered_crompressed_sampled}"
+# PGGB minia_polished:1 ends here
