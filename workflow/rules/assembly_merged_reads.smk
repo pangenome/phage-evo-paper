@@ -152,8 +152,8 @@ rule add_parental_genomes_and_get_sample:
     shell:
         "cat {input.parental_genomes} > {params.prefix} && "
         "samtools faidx {input.minia_assembly_polished_filtered_crompressed} "
-        "$( seq 1 10 | while read i; do zgrep  -P '^>P'$i'#' minia.k21.a7.min20Kb.max200Kb.contigs.polished.fa.gz | shuf -n 100 ; done | sed 's/>//' ) "
-        "> {params.prefix} && "
+        "$( seq 1 10 | while read i; do zgrep  -P '^>P'$i'#' {input.minia_assembly_polished_filtered_crompressed} | shuf -n 100 ; done | sed 's/>//' ) "
+        ">> {params.prefix} && "
         " bgzip -@ {threads}  {params.prefix} && "
         " samtools faidx {output.minia_assembly_polished_filtered_crompressed_sampled}"
 # Get sample and add parental phages genomes:1 ends here
