@@ -31,8 +31,8 @@ params:
     min_contig_lenght: 20_000
     max_contig_lenght: 200_000
   filtlong:
-    keep_percent: 95
-    min_length: 1_000
+    keep_percent: 90
+    min_length: 10_000
   pggb:
     minia_sample_size: 1_000
     map_pct_id: 90

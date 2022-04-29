@@ -32,7 +32,7 @@ SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fa
 # [[file:../main.org::*MAIN RULE ALL][MAIN RULE ALL:1]]
 rule all:
     input:
-        nanoplot = expand("results/nanoplot/{state}_filter", state=('before', 'after')),
+#        nanoplot = expand("results/nanoplot/{state}_filter", state=('before', 'after')),
         pggb_dir = "results/pggb/minia.assembly" + pggb_prefix + ".ecoli.and.phages"
 # MAIN RULE ALL:1 ends here
 
