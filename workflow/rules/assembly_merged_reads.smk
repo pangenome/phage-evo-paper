@@ -20,7 +20,7 @@ rule prefix_fastq:
         """
 # Merge reads:1 ends here
 
-# [[file:../../main.org::*NANOPLOT][NANOPLOT:1]]
+# [[file:../../main.org::*nanoplot][nanoplot:1]]
 rule nanoplot:
     input:
         samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.{state}_qc.fastq.gz'),
@@ -32,7 +32,7 @@ rule nanoplot:
         "../envs/nanoplot_env.yaml"
     shell:
         "NanoPlot -t {threads} --plots dot -o {output} --fastq {input}"
-# NANOPLOT:1 ends here
+# nanoplot:1 ends here
 
 # [[file:../../main.org::*FILTER READS][FILTER READS:1]]
 rule filter_reads:
@@ -176,3 +176,10 @@ rule pggb_minia:
         "n_mappings=$( zgrep -c '>' {input.minia_assembly_polished_filtered_crompressed_sampled} ) && "
         " pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -t {threads} -o {output} -i {input.minia_assembly_polished_filtered_crompressed_sampled}"
 # PGGB minia_polished:1 ends here
+
+# [[file:../../main.org::*Get distance matrix][Get distance matrix:1]]
+rule odgi_get_distance_matrix:
+    input:
+        odgi_graph = glob.glob(join_path("results/pggb/minia.assembly" + pggb_prefix + ".ecoli.and.phages",  '*.smooth.final.og'))[0]
+    output:
+# Get distance matrix:1 ends here

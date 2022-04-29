@@ -1,38 +1,44 @@
-# [[file:../../main.org::*Map reads to minia assembly][Map reads to minia assembly:1]]
+# [[file:../../main.org::*Prefix reads][Prefix reads:1]]
 rule prefix_fastq:
     input:
-        samples=expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
-    params:
-        samples_prefixed=join_path(config['data']['reads'], 'P1-10.merged.prefixed.fastq')
+        sample = join_path(config['data']['reads'], '{sample}.merged.fastq'),
     output:
-        samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.fastq.gz')
-    threads:
-        get_cores_perc(1)
-    shell:
-        """
-        echo {input.samples} \
-            | tr ' ' '\\n' \
-            | while read sample; do
-                prefix=$( basename $sample | cut -d'.' -f1)
-                sed -r '/^@.+runid/ s/^@/@'$prefix'#1#/' $sample >> {params.samples_prefixed}
-            done
-        cat {params.samples_prefixed} | pigz -p {threads} > {output.samples_prefixed_gzipped}
-        """
-# Map reads to minia assembly:1 ends here
-
-# [[file:../../main.org::*Filter out bacterial reads][Filter out bacterial reads:1]]
-rule minimap2_map_reads_to_refs:
-    input:
-        target = config['data']['genomes']['merged'],
-        samples_prefixed_gzipped = join_path(config['data']['reads'], 'P1-10.merged.prefixed.fastq.gz'),
-    output:
-        all_reads_sam = join_path(config['data']['reads'], 'P1-10.merged.prefixed_X_genomes.sam'),
-    params:
-        bacteria
+        sample_prefixed = join_path(config['data']['reads'], 'prefixed', '{sample}.prefixed.fastq.gz')
     threads:
         get_cores_perc(1)
     conda:
-        '../envs/minimap2_env.yaml'
+        '../envs/pggb_env.yaml'
     shell:
-        "minimap2 -L -ax map-ont -t {threads} {input.target} {input.samples_prefixed_gzipped} | {output.all_reads_sam} "
-# Filter out bacterial reads:1 ends here
+        "prefix=$( basename {input.sample} | cut -d'.' -f1) && "
+        "sed -r '/^@.+runid/ s/^@/@'$prefix'#1#/' {input.sample} | bgzip > {output.sample_prefixed}"
+# Prefix reads:1 ends here
+
+# [[file:../../main.org::*nanoplot][nanoplot:1]]
+rule quality_check_plot_before_filtering:
+    input:
+        sample = join_path(config['data']['reads'], '{state}', '{sample}.{state}.fastq.gz')
+    output:
+        plot_dir = directory("results/single/nanoplot/{state}/{sample}")
+    threads:
+        get_cores_perc(1)
+    conda:
+        "../envs/nanoplot_env.yaml"
+    shell:
+        "NanoPlot -t 2 --plots dot -o {output.plot_dir} --fastq {input.sample}"
+# nanoplot:1 ends here
+
+# [[file:../../main.org::*FILTER READS][FILTER READS:1]]
+rule filter_reads:
+    input:
+        prefixed = join_path(config['data']['reads'], 'prefixed', '{sample}.prefixed.fastq.gz')
+    output:
+        filtered = join_path(config['data']['reads'], 'filtered', '{sample}.filtered.fastq.gz')
+    params:
+        **config['params']['filtlong']
+    conda:
+        "../envs/filtlong_env.yaml"
+    threads:
+        get_cores_perc(1)
+    shell:
+        "filtlong --min_length {params.min_length} --keep_percent {params.keep_percent} {input.prefixed} | pigz > {output.filtered}"
+# FILTER READS:1 ends here

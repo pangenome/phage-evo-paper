@@ -65,6 +65,7 @@ A Snakemake workflow for `Phage directed evolution analysis`.
 import os
 import sys
 from operator import itemgetter as itget
+import glob
 #+END_SRC
 
 ** FILE CONFIGS
@@ -98,15 +99,25 @@ SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fa
 #+BEGIN_SRC snakemake
 rule all:
     input:
-        nanoplot = expand("results/nanoplot/{state}_filter", state=('before', 'after')),
-        pggb_dir = "results/pggb/minia.assembly" + pggb_prefix + ".ecoli.and.phages"
+        samples = expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
+        samples_processed = expand(join_path(config['data']['reads'], '{state}', '{sample}.{state}.fastq.gz'), sample=SAMPLES, state=('prefixed', 'filtered')),
+        plot_dir = expand("results/single/nanoplot/{state}/{sample}", sample=SAMPLES, state=('prefixed', 'filtered')),
+        # nanoplot_dirs = expand(join_path('results', 'single_assemblies', 'nanoplot', '{state}', '{sample}'), state=('prefixed','filtered'), sample=SAMPLES)
+        # plot_dir = expand("results/nanoplot/{state}", state=('before', 'after')),
+        # # assembly_merged_reads.smk
+        # nanoplot = expand("results/nanoplot/{state}_filter", state=('before', 'after')),
+        # pggb_dir = "results/pggb/minia.assembly" + pggb_prefix + ".ecoli.and.phages"
+
+        # assembly_each_passage_reads.smk
+        # samples = expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
+        # nanoplot_dirs = expand(join_path('results', 'single_assemblies', 'nanoplot', '{state}', '{sample}'), state=('before','after'), sample=SAMPLES)
 #+END_SRC
 
 ** Include
 #+BEGIN_SRC snakemake
 include:
-    'rules/assembly_merged_reads.smk'
-    # 'rules/assembly_each_passage_reads.smk'
+    # 'rules/assembly_merged_reads.smk'
+    'rules/assembly_each_passage_reads.smk'
 #+END_SRC
 
 * Rules
@@ -138,7 +149,7 @@ rule prefix_fastq:
         """
 #+END_SRC
 
-*** NANOPLOT
+*** nanoplot
 Get some quality check data (mostly read length distribution):
 #+BEGIN_SRC snakemake
 rule nanoplot:
@@ -280,8 +291,8 @@ rule add_parental_genomes_and_get_sample:
     shell:
         "cat {input.parental_genomes} > {params.prefix} && "
         "samtools faidx {input.minia_assembly_polished_filtered_crompressed} "
-        "$( seq 1 10 | while read i; do zgrep  -P '^>P'$i'#' minia.k21.a7.min20Kb.max200Kb.contigs.polished.fa.gz | shuf -n 100 ; done | sed 's/>//' ) "
-        "> {params.prefix} && "
+        "$( seq 1 10 | while read i; do zgrep  -P '^>P'$i'#' {input.minia_assembly_polished_filtered_crompressed} | shuf -n 100 ; done | sed 's/>//' ) "
+        ">> {params.prefix} && "
         " bgzip -@ {threads}  {params.prefix} && "
         " samtools faidx {output.minia_assembly_polished_filtered_crompressed_sampled}"
 #+END_SRC
@@ -296,7 +307,7 @@ rule pggb_minia:
     output:
         directory( "results/pggb/minia.assembly" + pggb_prefix + ".ecoli.and.phages" ),
     params:
-        ,**config['params']['pggb']
+        **config['params']['pggb']
     conda:
         '../envs/pggb_env.yaml'
     threads:
@@ -305,55 +316,69 @@ rule pggb_minia:
         "n_mappings=$( zgrep -c '>' {input.minia_assembly_polished_filtered_crompressed_sampled} ) && "
         " pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -t {threads} -o {output} -i {input.minia_assembly_polished_filtered_crompressed_sampled}"
 #+END_SRC
+
+*** Get distance matrix
+#+BEGIN_SRC snakemake
+rule odgi_get_distance_matrix:
+    input:
+        odgi_graph = glob.glob(join_path("results/pggb/minia.assembly" + pggb_prefix + ".ecoli.and.phages",  '*.smooth.final.og'))[0]
+    output:
+
+#+END_SRC
+
 ** Assembly each passage
 :PROPERTIES:
 :COOKIE_DATA: todo recursive
 :header-args: :tangle workflow/rules/assembly_each_passage_reads.smk :mkdirp yes :exports none :eval never-export :comments link
 :END:
-*** Map reads to minia assembly
+*** Prefix reads
 #+BEGIN_SRC snakemake
 rule prefix_fastq:
     input:
-        samples=expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
-    params:
-        samples_prefixed=join_path(config['data']['reads'], 'P1-10.merged.prefixed.fastq')
+        sample = join_path(config['data']['reads'], '{sample}.merged.fastq'),
     output:
-        samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.fastq.gz')
-    threads:
-        get_cores_perc(1)
-    shell:
-        """
-        echo {input.samples} \
-            | tr ' ' '\\n' \
-            | while read sample; do
-                prefix=$( basename $sample | cut -d'.' -f1)
-                sed -r '/^@.+runid/ s/^@/@'$prefix'#1#/' $sample >> {params.samples_prefixed}
-            done
-        cat {params.samples_prefixed} | pigz -p {threads} > {output.samples_prefixed_gzipped}
-        """
-#+END_SRC
-
-*** Filter out bacterial reads
-#+BEGIN_SRC snakemake
-rule minimap2_map_reads_to_refs:
-    input:
-        target = config['data']['genomes']['merged'],
-        samples_prefixed_gzipped = join_path(config['data']['reads'], 'P1-10.merged.prefixed.fastq.gz'),
-    output:
-        all_reads_sam = join_path(config['data']['reads'], 'P1-10.merged.prefixed_X_genomes.sam'),
-    params:
-        bacteria
+        sample_prefixed = join_path(config['data']['reads'], 'prefixed', '{sample}.prefixed.fastq.gz')
     threads:
         get_cores_perc(1)
     conda:
-        '../envs/minimap2_env.yaml'
+        '../envs/pggb_env.yaml'
     shell:
-        "minimap2 -L -ax map-ont -t {threads} {input.target} {input.samples_prefixed_gzipped} | {output.all_reads_sam} "
-
-
+        "prefix=$( basename {input.sample} | cut -d'.' -f1) && "
+        "sed -r '/^@.+runid/ s/^@/@'$prefix'#1#/' {input.sample} | bgzip > {output.sample_prefixed}"
 #+END_SRC
-**** TODO add samtools to minimap2 env
 
+*** nanoplot
+Get some quality check data (mostly read length distribution):
+#+BEGIN_SRC snakemake
+rule quality_check_plot_before_filtering:
+    input:
+        sample = join_path(config['data']['reads'], '{state}', '{sample}.{state}.fastq.gz')
+    output:
+        plot_dir = directory("results/single/nanoplot/{state}/{sample}")
+    threads:
+        get_cores_perc(1)
+    conda:
+        "../envs/nanoplot_env.yaml"
+    shell:
+        "NanoPlot -t 2 --plots dot -o {output.plot_dir} --fastq {input.sample}"
+#+END_SRC
+
+*** FILTER READS
+#+BEGIN_SRC snakemake
+rule filter_reads:
+    input:
+        prefixed = join_path(config['data']['reads'], 'prefixed', '{sample}.prefixed.fastq.gz')
+    output:
+        filtered = join_path(config['data']['reads'], 'filtered', '{sample}.filtered.fastq.gz')
+    params:
+        ,**config['params']['filtlong']
+    conda:
+        "../envs/filtlong_env.yaml"
+    threads:
+        get_cores_perc(1)
+    shell:
+        "filtlong --min_length {params.min_length} --keep_percent {params.keep_percent} {input.prefixed} | pigz > {output.filtered}"
+#+END_SRC
 * CONFIGS
 :PROPERTIES:
 :COOKIE_DATA: todo recursive
@@ -392,8 +417,8 @@ params:
     min_contig_lenght: 20_000
     max_contig_lenght: 200_000
   filtlong:
-    keep_percent: 95
-    min_length: 1_000
+    keep_percent: 90
+    min_length: 10_000
   pggb:
     minia_sample_size: 1_000
     map_pct_id: 90

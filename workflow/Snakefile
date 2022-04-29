@@ -2,6 +2,7 @@
 import os
 import sys
 from operator import itemgetter as itget
+import glob
 # IMPORTS:1 ends here
 
 # [[file:../main.org::*FILE CONFIGS][FILE CONFIGS:1]]
@@ -32,12 +33,22 @@ SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fa
 # [[file:../main.org::*MAIN RULE ALL][MAIN RULE ALL:1]]
 rule all:
     input:
-#        nanoplot = expand("results/nanoplot/{state}_filter", state=('before', 'after')),
-        pggb_dir = "results/pggb/minia.assembly" + pggb_prefix + ".ecoli.and.phages"
+        samples = expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
+        samples_processed = expand(join_path(config['data']['reads'], '{state}', '{sample}.{state}.fastq.gz'), sample=SAMPLES, state=('prefixed', 'filtered')),
+        plot_dir = expand("results/single/nanoplot/{state}/{sample}", sample=SAMPLES, state=('prefixed', 'filtered')),
+        # nanoplot_dirs = expand(join_path('results', 'single_assemblies', 'nanoplot', '{state}', '{sample}'), state=('prefixed','filtered'), sample=SAMPLES)
+        # plot_dir = expand("results/nanoplot/{state}", state=('before', 'after')),
+        # # assembly_merged_reads.smk
+        # nanoplot = expand("results/nanoplot/{state}_filter", state=('before', 'after')),
+        # pggb_dir = "results/pggb/minia.assembly" + pggb_prefix + ".ecoli.and.phages"
+
+        # assembly_each_passage_reads.smk
+        # samples = expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
+        # nanoplot_dirs = expand(join_path('results', 'single_assemblies', 'nanoplot', '{state}', '{sample}'), state=('before','after'), sample=SAMPLES)
 # MAIN RULE ALL:1 ends here
 
 # [[file:../main.org::*Include][Include:1]]
 include:
-    'rules/assembly_merged_reads.smk'
-    # 'rules/assembly_each_passage_reads.smk'
+    # 'rules/assembly_merged_reads.smk'
+    'rules/assembly_each_passage_reads.smk'
 # Include:1 ends here
