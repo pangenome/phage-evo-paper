@@ -361,7 +361,7 @@ rule quality_check_plot_before_filtering:
     conda:
         "../envs/nanoplot_env.yaml"
     shell:
-        "NanoPlot -t 4 --plots dot -o {output.plot_dir} --fastq {input.sample}"
+        "NanoPlot -t 2 --plots dot -o {output.plot_dir} --fastq {input.sample}"
 #+END_SRC
 
 *** FILTER READS
@@ -393,11 +393,10 @@ rule minia:
         4
     params:
         ,**config['params']['minia'],
-        prefix_fasta=minia_prefix
     conda:
         '../envs/minia_env.yaml'
     shell:
-        "minia -nb-cores {params.cores} -kmer-size {params.kmer} -abundance-min {params.abundance} -out {params.prefix_fasta} -in {input.filtered} && "
+        "minia -nb-cores {params.cores} -kmer-size {params.kmer} -abundance-min {params.abundance} -out $( echo {output.minia_assembly} | sed 's/.contigs.fa//' ) -in {input.filtered} && "
         " find $( dirname {output.minia_assembly} ) -type f ! -name '*'$(basename {output.minia_assembly}) -exec rm {{}} \;"
 #+END_SRC
 *** fasta to gfa
