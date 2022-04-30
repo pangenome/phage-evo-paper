@@ -21,11 +21,11 @@ snakefile_path = os.path.dirname(workflow.snakefile)
 # SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
 
 # Prefixes
-minia_prefix="results/assemblies/minia/minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
+minia_prefix="minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
 pggb_prefix=".p{}.s{}.l{}".format(*itget("map_pct_id", "segment_length", "block_length")(config['params']['pggb']))
 
 # Suffixes
-filter_contigs_prefix = minia_prefix + '.min{}Kb.max{}Kb'.format(*iter(map(get_Kbs, itget('min_contig_lenght', 'max_contig_lenght')(config['params']['minia']))))
+filter_contigs_prefix = '.min{}Kb.max{}Kb'.format(*iter(map(get_Kbs, itget('min_contig_lenght', 'max_contig_lenght')(config['params']['minia']))))
 
 SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fastq'))
 # GLOBAL VARIABLES:1 ends here
@@ -36,6 +36,7 @@ rule all:
         samples = expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
         samples_processed = expand(join_path(config['data']['reads'], '{state}', '{sample}.{state}.fastq.gz'), sample=SAMPLES, state=('prefixed', 'filtered')),
         plot_dir = expand("results/single/nanoplot/{state}/{sample}", sample=SAMPLES, state=('prefixed', 'filtered')),
+        minia_assembly_polished_filtered = expand(join_path('results', 'single', 'minia', '{sample}', '{sample}.' + minia_prefix + ".contigs.polished" + filter_contigs_prefix + ".fa.gz"), sample=SAMPLES),
         # nanoplot_dirs = expand(join_path('results', 'single_assemblies', 'nanoplot', '{state}', '{sample}'), state=('prefixed','filtered'), sample=SAMPLES)
         # plot_dir = expand("results/nanoplot/{state}", state=('before', 'after')),
         # # assembly_merged_reads.smk

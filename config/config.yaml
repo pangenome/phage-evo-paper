@@ -27,9 +27,10 @@ results:
 params:
   minia:
     kmer: 21
-    abundance: 7
+    abundance: 3
     min_contig_lenght: 20_000
     max_contig_lenght: 200_000
+    cores: 10
   filtlong:
     keep_percent: 90
     min_length: 10_000
