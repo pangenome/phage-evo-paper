@@ -97,12 +97,14 @@ rule polishing_graphaligner_minia:
 # Graphaligner MINIA:1 ends here
 
 # [[file:../../main.org::*Filter by length][Filter by length:1]]
-rule filter_by_length:
+rule filter_by_length_and_index:
     input:
         minia_assembly_gfa_polished = join_path('results', 'single', 'minia', '{sample}', '{sample}.' + minia_prefix + ".contigs.polished.fa"),
         script = join_path(snakefile_path, 'scripts', 'filter_by_length.py')
     output:
-        minia_assembly_polished_filtered = join_path('results', 'single', 'minia', '{sample}', '{sample}.' + minia_prefix + ".contigs.polished" + filter_contigs_prefix + ".fa.gz")
+        minia_assembly_polished_filtered = join_path('results', 'single', 'minia', '{sample}', '{sample}.' + minia_prefix + ".contigs.polished" + filter_contigs_prefix + ".fa.gz"),
+        fai = join_path('results', 'single', 'minia', '{sample}', '{sample}.' + minia_prefix + ".contigs.polished" + filter_contigs_prefix + ".fa.gz.fai"),
+        giz = join_path('results', 'single', 'minia', '{sample}', '{sample}.' + minia_prefix + ".contigs.polished" + filter_contigs_prefix + ".fa.gz.gzi"),
     params:
         **config['params']['minia']
     conda:
@@ -110,5 +112,6 @@ rule filter_by_length:
     threads:
         10
     shell:
-        "python3 {input.script} {input.minia_assembly_gfa_polished} {params.min_contig_lenght}  {params.max_contig_lenght} | bgzip > {output.minia_assembly_polished_filtered}"
+        "python3 {input.script} {input.minia_assembly_gfa_polished} {params.min_contig_lenght}  {params.max_contig_lenght} | bgzip > {output.minia_assembly_polished_filtered} && "
+        "samtools faidx {output.minia_assembly_polished_filtered}"
 # Filter by length:1 ends here
