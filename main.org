@@ -524,7 +524,7 @@ rule get_distance_metrics:
     conda:
         '../envs/pggb_env.yaml'
     shell:
-        "odgi paths -t {threads} -H -i {input.pggb_out}/*.smooth.final.og > {output.distance_tsv}"
+        "odgi paths -t {threads} -d -i {input.pggb_out}/*.smooth.final.og > {output.distance_tsv}"
 #+END_SRC
 
 

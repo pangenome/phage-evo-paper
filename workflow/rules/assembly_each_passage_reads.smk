@@ -145,7 +145,7 @@ rule merge_samples_and_parental_genomes:
     threads:
         get_cores_perc(1)
     shell:
-        "cat {input.ecoli_and_phages} <(zcat {input.sampled_genomes}) | bgzip -@ {threads} > {output.pggb_input} && "
+        "cat {input.ecoli_and_phage s} <(zcat {input.sampled_genomes}) | bgzip -@ {threads} > {output.pggb_input} && "
         "samtools faidx {output.pggb_input}"
 # Merge samples:1 ends here
 
@@ -179,5 +179,5 @@ rule get_distance_metrics:
     conda:
         '../envs/pggb_env.yaml'
     shell:
-        "odgi paths -t {threads} -H -i {input.pggb_out}/*.smooth.final.og > {output.distance_tsv}"
+        "odgi paths -t {threads} -d -i {input.pggb_out}/*.smooth.final.og > {output.distance_tsv}"
 # Get distance:1 ends here
