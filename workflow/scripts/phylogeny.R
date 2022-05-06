@@ -10,24 +10,38 @@ suppressPackageStartupMessages(
         require(ggtree)
     })
 
-
 input <- '/home/hugo/projects/phage-evo-paper/results/single/pggb/distance_matrix_removed_ecoli_removed_phages.tsv'
 output <- 'plots'
 
-colfunc <- colorRampPalette(c("red", "yellow"))
+# colfunc <- colorRampPalette(c("red", "yellow"))
 # phage.colors=c(colfunc(10), rainbow(8)[3:7])
 
-passages = paste0("P",1:10)
-phage.colors = structure(colfunc(length(phage_and_passages)), names = passages)
-print(phage.colors)
+y <- read.delim(input)
+y %>% mutate(path.a=path.a, path.b=path.b, jaccard=jaccard, path.a.length=NULL, path.b.length=NULL, intersection=NULL, euclidean=NULL) %>% pivot_wider(names_from=path.b, values_from=jaccard) %>% replace(is.na(.), 0) -> y.dist
+y.tree <- nj(as.dist(y.dist[, !names(y.dist) %in% c("path.a")]))
 
+p <- ggtree(y.tree, layout = 'rectangular', branch.length = 'none') %<+% data_frame(
+  labels = y.tree$tip.label,
+  passages = str_split_fixed(y.tree$tip.label, "#", 2)[,1]
+) + aes(color=passages)  + geom_tree()
 
-x <- read.delim(input)
-x %>% mutate(path.a=path.a, path.b=path.b, jaccard=jaccard, path.a.length=NULL, path.b.length=NULL, intersection=NULL, euclidean=NULL) %>% pivot_wider(names_from=path.b, values_from=jaccard) %>% replace(is.na(.), 0) -> x.dist
-x.tree <- nj(as.dist(x.dist[, !names(x.dist) %in% c("path.a")]))
-p <- ggtree(x.tree, options(ignore.negative.edge=TRUE),  branch.length='none') # + xlim(0, 0.025 ) + geom_treescale()
+# Eriks code
+# ggtree(y.tree) %<+% data.frame(
+#   node=1:nrow(y.tree$edge),
+#   group.name=factor()
+# ) + aes(color=group.name)
+#   + geom_tree()
+#   + scale_color_manual("passage",values=c(phage.colors, "black"))
 
-teste <- data.frame(x.tree["tip.label"])
-teste$prefix <- str_split_fixed(teste$tip.label, "#", 2)[,1]
-teste$color <- vapply(teste$prefix, (function(x) phage.colors[x]), FUN.VALUE = 'character', )
-teste[["color"]][is.na(teste[["color"]])] <- 'black'
+# p <- ggtree(y.tree) %<+% data.frame(
+#   node=1:nrow(y.tree$edge),
+#   group.name=factor(
+#     c(as.character(y$path.a),rep("internal",nrow(y.tree$edge) - nrow(y))),
+#     levels=c(levels(y$path.a),"internal") 
+#   )
+# )
+#   + aes(color=group.name)
+#   + geom_tree()
+#   + scale_color_manual("passage",values=c(phage.colors, "black"))
+
+# ggsave(paste(output, "ggtree.passage.pdf", sep="."), height=40, width=9)
