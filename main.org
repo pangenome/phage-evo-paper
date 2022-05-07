@@ -490,10 +490,10 @@ rule merge_samples_and_parental_genomes:
     threads:
         get_cores_perc(1)
     shell:
-        "cat {input.ecoli_and_phage s} <(zcat {input.sampled_genomes}) | bgzip -@ {threads} > {output.pggb_input} && "
+        "cat {input.ecoli_and_phages} <(zcat {input.sampled_genomes}) | bgzip -@ {threads} > {output.pggb_input} && "
         "samtools faidx {output.pggb_input}"
 #+END_SRC
-*** Pangenome
+*** Pangenome PGGB
 #+BEGIN_SRC snakemake
 rule pggb_pangenome:
     input:
@@ -526,7 +526,20 @@ rule get_distance_metrics:
     shell:
         "odgi paths -t {threads} -d -i {input.pggb_out}/*.smooth.final.og > {output.distance_tsv}"
 #+END_SRC
+*** R phylogeny
+#+BEGIN_SRC snakemake
+# rule phylogeny:
+#     input:
+#         distance_tsv = join_path('results', 'single', 'pggb', 'distance_matrix.tsv'),
+#         script = join_path(snakefile_path, 'scripts', 'phylogeny.R'),
+#     output:
+#         phylogeny_svg = join_path('results', 'phylogeny', 'tree.svg'),
+#         phylogeny_pdf = join_path('results', 'phylogeny', 'tree.pdf'),
+#         phylogeny_newick = join_path('results', 'phylogeny', 'tree.newick'),
+#         pca_pdf = join_path('results', 'phylogeny', 'pca.pdf'),
 
+#+END_SRC
+*** Genomic anotation
 
 * CONFIGS
 :PROPERTIES:
