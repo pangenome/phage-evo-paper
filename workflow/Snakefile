@@ -34,9 +34,13 @@ SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fa
 rule all:
     input:
         samples = expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
-        samples_processed = expand(join_path(config['data']['reads'], '{state}', '{sample}.{state}.fastq.gz'), sample=SAMPLES, state=('prefixed', 'filtered')),
-        plot_dir = expand("results/single/nanoplot/{state}/{sample}", sample=SAMPLES, state=('prefixed', 'filtered')),
-        distance_tsv = join_path('results', 'single', 'pggb', 'distance_matrix.tsv'),
+        minia_assembly_gfa =  expand(join_path('results', 'test_abundance', 'minia', 'A{abundance}.K{kmer}', 'minia.assembly.contigs.gfa'), abundance=list(range(3,20)), kmer=list(range(21,33))),
+        # # SINGLE ASSEMBLY
+        # samples = expand(join_path(config['data']['reads'], '{sample}.merged.fastq'), sample=SAMPLES),
+        # samples_processed = expand(join_path(config['data']['reads'], '{state}', '{sample}.{state}.fastq.gz'), sample=SAMPLES, state=('prefixed', 'filtered')),
+        # plot_dir = expand("results/single/nanoplot/{state}/{sample}", sample=SAMPLES, state=('prefixed', 'filtered')),
+        # distance_tsv = join_path('results', 'single', 'pggb', 'distance_matrix.tsv'),
+        ##################
         # minia_assembly_polished_filtered = expand(join_path('results', 'single', 'minia', '{sample}', '{sample}.' + minia_prefix + ".contigs.polished" + filter_contigs_prefix + ".fa.gz"), sample=SAMPLES),
         # nanoplot_dirs = expand(join_path('results', 'single_assemblies', 'nanoplot', '{state}', '{sample}'), state=('prefixed','filtered'), sample=SAMPLES)
         # plot_dir = expand("results/nanoplot/{state}", state=('before', 'after')),
@@ -51,6 +55,5 @@ rule all:
 
 # [[file:../main.org::*Include][Include:1]]
 include:
-    # 'rules/assembly_merged_reads.smk'
-    'rules/assembly_each_passage_reads.smk'
+    'rules/best_abundance.smk'
 # Include:1 ends here

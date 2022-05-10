@@ -145,11 +145,11 @@ rule merge_samples_and_parental_genomes:
     threads:
         get_cores_perc(1)
     shell:
-        "cat {input.ecoli_and_phage s} <(zcat {input.sampled_genomes}) | bgzip -@ {threads} > {output.pggb_input} && "
+        "cat {input.ecoli_and_phages} <(zcat {input.sampled_genomes}) | bgzip -@ {threads} > {output.pggb_input} && "
         "samtools faidx {output.pggb_input}"
 # Merge samples:1 ends here
 
-# [[file:../../main.org::*Pangenome][Pangenome:1]]
+# [[file:../../main.org::*Pangenome PGGB][Pangenome PGGB:1]]
 rule pggb_pangenome:
     input:
         pggb_input = join_path('results', 'single', 'pggb', 'minia.merged.1K.sample.fa.gz'),
@@ -166,7 +166,7 @@ rule pggb_pangenome:
     shell:
         "n_mappings=$( zgrep -c '>' {input.pggb_input} ) && "
         "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -t {threads} -o {output.pggb_out} -i {input.pggb_input}"
-# Pangenome:1 ends here
+# Pangenome PGGB:1 ends here
 
 # [[file:../../main.org::*Get distance][Get distance:1]]
 rule get_distance_metrics:
@@ -181,3 +181,15 @@ rule get_distance_metrics:
     shell:
         "odgi paths -t {threads} -d -i {input.pggb_out}/*.smooth.final.og > {output.distance_tsv}"
 # Get distance:1 ends here
+
+# [[file:../../main.org::*R phylogeny][R phylogeny:1]]
+# rule phylogeny:
+#     input:
+#         distance_tsv = join_path('results', 'single', 'pggb', 'distance_matrix.tsv'),
+#         script = join_path(snakefile_path, 'scripts', 'phylogeny.R'),
+#     output:
+#         phylogeny_svg = join_path('results', 'phylogeny', 'tree.svg'),
+#         phylogeny_pdf = join_path('results', 'phylogeny', 'tree.pdf'),
+#         phylogeny_newick = join_path('results', 'phylogeny', 'tree.newick'),
+#         pca_pdf = join_path('results', 'phylogeny', 'pca.pdf'),
+# R phylogeny:1 ends here

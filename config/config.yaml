@@ -26,8 +26,8 @@ results:
 # minia
 params:
   minia:
-    kmer: 21
-    abundance: 3
+    kmer: 31
+    abundance: 5
     min_contig_lenght: 40_000
     max_contig_lenght: 50_000
     cores: 10
