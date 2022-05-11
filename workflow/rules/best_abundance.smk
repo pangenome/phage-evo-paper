@@ -32,22 +32,3 @@ rule minia_fasta_to_gfa:
     shell:
         "python {input.script} {input.minia_assembly} {output.minia_assembly_gfa} {params.kmer}"
 # fasta to gfa:1 ends here
-
-# [[file:../../main.org::*Graphaligner MINIA][Graphaligner MINIA:1]]
-# rule polishing_graphaligner_minia:
-#     input:
-#         samples_prefixed_gzipped = join_path(config['data']['reads'], 'prefixed', 'P1.prefixed.fastq.gz'),
-#         minia_assembly_gfa =  join_path('results', 'test_abundance', 'minia', 'A{abundance}.K{kmer}', 'minia.assembly', '.contigs.gfa'),
-#     output:
-#         minia_gaf = join_path('results', 'test_abundance', 'minia', 'A{abundance}.K{kmer}', 'minia.assembly', '.contigs.gaf'),
-#         minia_assembly_gfa_polished = join_path('results', 'test_abundance', 'minia', 'A{abundance}.K{kmer}', 'minia.assembly', '.contigs.polished.fa'),
-#     threads:
-#         4
-#     params:
-#         dbtype = "vg",
-#         seed_minimizer = 15
-#     conda:
-#         '../envs/graphaligner_env.yaml'
-#     shell:
-#         "GraphAligner -g {input.minia_assembly_gfa} -f {input.samples_prefixed_gzipped} -x {params.dbtype} --threads 10 --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minia_gaf} --corrected-out {output.minia_assembly_gfa_polished}"
-# Graphaligner MINIA:1 ends here

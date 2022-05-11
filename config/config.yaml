@@ -14,7 +14,7 @@ data:
     phages: 'data/genomes/phage'
     ecoli_and_phages: 'data/genomes/ecoli_bl21_DE_and_phages_merged.fasta'
 
-# Results
+
 results:
   nanoplot:
     before: 'results/nanoplot/before_filter'
@@ -26,10 +26,12 @@ results:
 # minia
 params:
   minia:
-    kmer: 31
-    abundance: 5
+    kmer: 33
+    abundance: 4
     min_contig_lenght: 40_000
     max_contig_lenght: 50_000
+    P1_abundance: 4
+    P1_bp: 186778684
     cores: 10
   filtlong:
     keep_percent: 90
