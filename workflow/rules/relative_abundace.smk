@@ -25,14 +25,14 @@ rule minia:
     output:
         minia_assembly =  join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.fa'),
     threads:
-        4
+        get_cores_perc(0.1)
     params:
         **config['params']['minia'],
     conda:
         '../envs/minia_env.yaml'
     shell:
-        "RELATIVE_ABUNDACE=$( {input.script_abundance} {params.P1_abundance} {params.P1_bp} {input.prefixed} ) && "
-        "minia -nb-cores {params.cores} -kmer-size {params.kmer} -abundance-min $RELATIVE_ABUNDACE -out $(echo {output.minia_assembly} | sed 's/.contigs.fa//') -in {input.prefixed} && "
+        "RELATIVE_ABUNDACE=$( {input.script_abundance} {params.P1_abundance} {params.P1_bp} {input.prefixed} | cut -f1 -d '.') && "
+        "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min $RELATIVE_ABUNDACE -out $(echo {output.minia_assembly} | sed 's/.contigs.fa//') -in {input.prefixed} && "
         " find $( dirname {output.minia_assembly} ) -type f ! -name '*'$(basename {output.minia_assembly}) -exec rm {{}} \;"
 # Minia assembly:1 ends here
 
@@ -48,7 +48,7 @@ rule minia_fasta_to_gfa:
     conda:
         '../envs/minia_env.yaml'
     threads:
-        10
+        1
     shell:
         "python {input.script} {input.minia_assembly} {output.minia_assembly_gfa} {params.kmer}"
 # fasta to gfa:1 ends here
@@ -60,22 +60,25 @@ rule polishing_graphaligner_minia:
         minia_assembly_gfa = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.gfa')
     output:
         minia_gaf = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished.gaf'),
-        minia_assembly_gfa_polished = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished.gfa'),
+        minia_assembly_gfa_polished = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished.fa'),
     threads:
-        4
+        get_cores_perc(1)
     params:
         dbtype = "vg",
         seed_minimizer = 15
     conda:
         '../envs/graphaligner_env.yaml'
     shell:
-        "GraphAligner -g {input.minia_assembly_gfa} -f {input.samples_prefixed_gzipped} -x {params.dbtype} --threads 10 --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minia_gaf} --corrected-out {output.minia_assembly_gfa_polished}"
+        "GraphAligner -g {input.minia_assembly_gfa} -f {input.samples_prefixed_gzipped} -x {params.dbtype} "
+        "--threads {threads} --seeds-minimizer-length {params.seed_minimizer} "
+        "--seeds-minimizer-windowsize {params.seed_minimizer} "
+        "-a {output.minia_gaf} --corrected-out {output.minia_assembly_gfa_polished}"
 # Graphaligner MINIA:1 ends here
 
 # [[file:../../main.org::*Filter by length][Filter by length:1]]
 rule filter_by_length_and_index:
     input:
-        minia_assembly_gfa_polished = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished.gfa'),
+        minia_assembly_gfa_polished = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished.fa'),
         script = join_path(snakefile_path, 'scripts', 'filter_by_length.py')
     output:
         minia_assembly_polished_filtered = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + ".fa.gz"),
@@ -86,7 +89,7 @@ rule filter_by_length_and_index:
     conda:
         '../envs/bio_env.yaml'
     threads:
-        10
+        1
     shell:
         "python3 {input.script} {input.minia_assembly_gfa_polished} {params.min_contig_lenght}  {params.max_contig_lenght} | bgzip > {output.minia_assembly_polished_filtered} && "
         "samtools faidx {output.minia_assembly_polished_filtered}"
@@ -99,9 +102,9 @@ rule sample_genomes:
     output:
         sampled_genomes = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + '.sample1k.fa.gz' ),
     params:
-        sample_size = 100
+        sample_size = config['sample_size']
     threads:
-        5
+        1
     shell:
         "samtools faidx {input.minia_assembly_polished_filtered} $(zgrep '>' {input.minia_assembly_polished_filtered} | sed 's/>//' | shuf -n {params.sample_size}) | "
         "gzip > {output.sampled_genomes}"

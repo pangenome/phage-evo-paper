@@ -5,6 +5,8 @@
 # reads: 'data/fastq'
 # parental_phages: 'data/genomes/phage/parental.phage.merged.fasta'
 
+sample_size: 10
+
 data:
   reads: 'data/fastq'
   genomes:
