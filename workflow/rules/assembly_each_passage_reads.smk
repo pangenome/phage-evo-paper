@@ -46,33 +46,35 @@ rule filter_reads:
 # [[file:../../main.org::*Minia assembly][Minia assembly:1]]
 rule minia:
     input:
-        filtered = join_path(config['data']['reads'], 'filtered', '{sample}.filtered.fastq.gz')
+        prefixed = join_path(config['data']['reads'], 'prefixed', '{sample}.prefixed.fastq.gz'),
+        script_abundance = join_path(snakefile_path, 'scripts', 'get_abundance.sh'),
     output:
-        minia_assembly =  join_path('results', 'single', 'minia', '{sample}', '{sample}.' + minia_prefix + ".contigs.fa")
+        minia_assembly =  join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.fa'),
     threads:
-        4
+        get_cores_perc(0.1)
     params:
         **config['params']['minia'],
     conda:
         '../envs/minia_env.yaml'
     shell:
-        "minia -nb-cores {params.cores} -kmer-size {params.kmer} -abundance-min {params.abundance} -out $( echo {output.minia_assembly} | sed 's/.contigs.fa//' ) -in {input.filtered} && "
+        "RELATIVE_ABUNDACE=$( {input.script_abundance} {params.P1_abundance} {params.P1_bp} {input.prefixed} | cut -f1 -d '.') && "
+        "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min $RELATIVE_ABUNDACE -out $(echo {output.minia_assembly} | sed 's/.contigs.fa//') -in {input.prefixed} && "
         " find $( dirname {output.minia_assembly} ) -type f ! -name '*'$(basename {output.minia_assembly}) -exec rm {{}} \;"
 # Minia assembly:1 ends here
 
 # [[file:../../main.org::*fasta to gfa][fasta to gfa:1]]
 rule minia_fasta_to_gfa:
     input:
-        minia_assembly =  join_path('results', 'single', 'minia', '{sample}', '{sample}.' + minia_prefix + ".contigs.fa"),
-        script=join_path(snakefile_path, 'scripts', 'convertToGFA.py'),
+        minia_assembly =  join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.fa'),
+        script = join_path(snakefile_path, 'scripts', 'convertToGFA.py'),
     output:
-        minia_assembly_gfa = join_path('results', 'single', 'minia', '{sample}', '{sample}.' + minia_prefix + ".contigs.gfa")
+        minia_assembly_gfa = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.gfa')
     params:
         **config['params']['minia'],
     conda:
         '../envs/minia_env.yaml'
     threads:
-        10
+        1
     shell:
         "python {input.script} {input.minia_assembly} {output.minia_assembly_gfa} {params.kmer}"
 # fasta to gfa:1 ends here
@@ -119,13 +121,13 @@ rule filter_by_length_and_index:
 # [[file:../../main.org::*Sample 1000][Sample 1000:1]]
 rule sample_genomes:
     input:
-        minia_assembly_polished_filtered = join_path('results', 'single', 'minia', '{sample}', '{sample}.' + minia_prefix + ".contigs.polished" + filter_contigs_prefix + ".fa.gz"),
+        minia_assembly_polished_filtered = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + ".fa.gz"),
     output:
-        sampled_genomes = join_path('results', 'single', 'minia', '{sample}', '{sample}.' + minia_prefix + ".contigs.polished" + filter_contigs_prefix + ".sample1k.fa.gz"),
+        sampled_genomes = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + '.sample1k.fa.gz' ),
     params:
-        sample_size = 100
+        sample_size = config['sample_size']
     threads:
-        5
+        1
     shell:
         "samtools faidx {input.minia_assembly_polished_filtered} $(zgrep '>' {input.minia_assembly_polished_filtered} | sed 's/>//' | shuf -n {params.sample_size}) | "
         "gzip > {output.sampled_genomes}"
@@ -134,12 +136,12 @@ rule sample_genomes:
 # [[file:../../main.org::*Merge samples][Merge samples:1]]
 rule merge_samples_and_parental_genomes:
     input:
-        sampled_genomes = expand(join_path('results', 'single', 'minia', '{sample}', '{sample}.' + minia_prefix + ".contigs.polished" + filter_contigs_prefix + ".sample1k.fa.gz"), sample=SAMPLES),
+        sampled_genomes = expand(join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + '.sample1k.fa.gz' ), sample=SAMPLES),
         ecoli_and_phages = config['data']['genomes']['ecoli_and_phages'],
     output:
-        pggb_input = join_path('results', 'single', 'pggb', 'minia.merged.1K.sample.fa.gz'),
-        fai = join_path('results', 'single', 'pggb', 'minia.merged.1K.sample.fa.gz.fai'),
-        gzi = join_path('results', 'single', 'pggb', 'minia.merged.1K.sample.fa.gz.gzi'),
+        pggb_input = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz'),
+        fai = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz.fai'),
+        gzi = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz.gzi'),
     conda:
         '../envs/pggb_env.yaml'
     threads:
@@ -152,11 +154,11 @@ rule merge_samples_and_parental_genomes:
 # [[file:../../main.org::*Pangenome PGGB][Pangenome PGGB:1]]
 rule pggb_pangenome:
     input:
-        pggb_input = join_path('results', 'single', 'pggb', 'minia.merged.1K.sample.fa.gz'),
-        fai = join_path('results', 'single', 'pggb', 'minia.merged.1K.sample.fa.gz.fai'),
-        gzi = join_path('results', 'single', 'pggb', 'minia.merged.1K.sample.fa.gz.gzi'),
+        pggb_input = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz'),
+        fai = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz.fai'),
+        gzi = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz.gzi'),
     output:
-        pggb_out = directory(join_path('results', 'single', 'pggb', 'out')),
+        pggb_out = directory(join_path('results', results_dir, 'pggb', 'out')),
     params:
         **config['params']['pggb']
     threads:
@@ -171,9 +173,9 @@ rule pggb_pangenome:
 # [[file:../../main.org::*Get distance][Get distance:1]]
 rule get_distance_metrics:
     input:
-        pggb_out = join_path('results', 'single', 'pggb', 'out'),
+        pggb_out = join_path('results', results_dir, 'pggb', 'out'),
     output:
-        distance_tsv = join_path('results', 'single', 'pggb', 'distance_matrix.tsv'),
+        distance_tsv = join_path('results', results_dir, 'pggb', 'distance_matrix.tsv'),
     threads:
         get_cores_perc(1)
     conda:

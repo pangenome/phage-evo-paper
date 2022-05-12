@@ -84,37 +84,44 @@ rule minia_fasta_to_gfa:
 
 # [[file:../../main.org::*Graphaligner MINIA][Graphaligner MINIA:1]]
 rule polishing_graphaligner_minia:
-    conda:
-        '../envs/graphaligner_env.yaml'
     input:
-        # samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.before_qc.fastq.gz'),
-        samples_prefixed_gzipped=join_path(config['data']['reads'], 'P1-10.merged.prefixed.after_qc.fastq.gz'),
-        minia_assembly_gfa=minia_prefix+'.contigs.gfa'
+        samples_prefixed_gzipped = join_path(config['data']['reads'], 'prefixed', '{sample}.prefixed.fastq.gz'),
+        minia_assembly_gfa = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.gfa')
     output:
-        minia_gaf=minia_prefix+'.contigs.gaf',
-        minia_assembly_gfa_polished=minia_prefix+'.contigs.polished.fa'
+        minia_gaf = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished.gaf'),
+        minia_assembly_gfa_polished = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished.fa'),
     threads:
         get_cores_perc(1)
     params:
         dbtype = "vg",
         seed_minimizer = 15
+    conda:
+        '../envs/graphaligner_env.yaml'
     shell:
-        "GraphAligner -g {input.minia_assembly_gfa} -f {input.samples_prefixed_gzipped} -x {params.dbtype} --threads {threads} --seeds-minimizer-length {params.seed_minimizer} --seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minia_gaf} --corrected-out {output.minia_assembly_gfa_polished}"
+        "GraphAligner -g {input.minia_assembly_gfa} -f {input.samples_prefixed_gzipped} -x {params.dbtype} "
+        "--threads {threads} --seeds-minimizer-length {params.seed_minimizer} "
+        "--seeds-minimizer-windowsize {params.seed_minimizer} "
+        "-a {output.minia_gaf} --corrected-out {output.minia_assembly_gfa_polished}"
 # Graphaligner MINIA:1 ends here
 
 # [[file:../../main.org::*Filter by length][Filter by length:1]]
-rule filter_by_length:
+rule filter_by_length_and_index:
     input:
-        minia_assembly_gfa_polished = minia_prefix+'.contigs.polished.fa',
+        minia_assembly_gfa_polished = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished.fa'),
         script = join_path(snakefile_path, 'scripts', 'filter_by_length.py')
     output:
-        minia_assembly_polished_filtered = filter_contigs_prefix + '.contigs.polished.fa'
+        minia_assembly_polished_filtered = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + ".fa.gz"),
+        fai = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + ".fa.gz.fai"),
+        gzi = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + ".fa.gz.gzi"),
     params:
         **config['params']['minia']
     conda:
         '../envs/bio_env.yaml'
+    threads:
+        1
     shell:
-        "python3 {input.script} {input.minia_assembly_gfa_polished} {params.min_contig_lenght}  {params.max_contig_lenght} > {output.minia_assembly_polished_filtered}"
+        "python3 {input.script} {input.minia_assembly_gfa_polished} {params.min_contig_lenght}  {params.max_contig_lenght} | bgzip > {output.minia_assembly_polished_filtered} && "
+        "samtools faidx {output.minia_assembly_polished_filtered}"
 # Filter by length:1 ends here
 
 # [[file:../../main.org::*Create index][Create index:1]]

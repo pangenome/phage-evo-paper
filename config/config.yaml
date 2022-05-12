@@ -43,6 +43,9 @@ params:
     map_pct_id: 90
     segment_length: 1_000
     block_length: 0
+  seqkit:
+    min: 40_000
+    max: 50_000
 
 # Sample genomes from assembly
 # CONFIGS:1 ends here
