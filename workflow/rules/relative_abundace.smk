@@ -77,7 +77,7 @@ rule polishing_graphaligner_minia:
         minia_assembly_gfa = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.gfa'),
     output:
         minia_gaf = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.gaf'),
-        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa.gz'),
+        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa'),
     threads:
         get_cores_perc(0.3)
     params:
@@ -91,3 +91,70 @@ rule polishing_graphaligner_minia:
         "--seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minia_gaf} "
         "--corrected-out {output.polished_reads}"
 # Graphaligner MINIA:1 ends here
+
+# [[file:../../main.org::*Sample 1000][Sample 1000:1]]
+rule sample_genomes:
+    input:
+        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa'),
+    output:
+        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.fa.gz' ),
+    params:
+        sample_size = 100
+    threads:
+        4
+    shell:
+        "bgzip -@ {threads} {input.polished_reads} && "
+        "samtools faidx {input.polished_reads}.gz $(zgrep '>' {input.polished_reads}.gz | sed 's/>//' | shuf -n {params.sample_size}) | "
+        "bgzip > {output.polished_reads}"
+# Sample 1000:1 ends here
+
+# [[file:../../main.org::*Merge samples][Merge samples:1]]
+rule merge_samples_and_parental_genomes:
+    input:
+        polished_reads = expand(join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.fa.gz' ), sample=SAMPLES),
+        ecoli_and_phages = config['data']['genomes']['ecoli_and_phages'],
+    output:
+        pggb_input = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz'),
+        fai = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz.fai'),
+        gzi = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz.gzi'),
+    conda:
+        '../envs/pggb_env.yaml'
+    threads:
+        get_cores_perc(1)
+    shell:
+        "cat {input.ecoli_and_phages} <(zcat {input.polished_reads}) | bgzip -@ {threads} > {output.pggb_input} && "
+        "samtools faidx {output.pggb_input}"
+# Merge samples:1 ends here
+
+# [[file:../../main.org::*Pangenome PGGB][Pangenome PGGB:1]]
+rule pggb_pangenome:
+    input:
+        pggb_input = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz'),
+        fai = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz.fai'),
+        gzi = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz.gzi'),
+    output:
+        pggb_out = directory(join_path('results', results_dir, 'pggb', 'out')),
+    params:
+        **config['params']['pggb']
+    threads:
+        get_cores_perc(1)
+    conda:
+        '../envs/pggb_env.yaml'
+    shell:
+        "n_mappings=$( zgrep -c '>' {input.pggb_input} ) && "
+        "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -t {threads} -o {output.pggb_out} -i {input.pggb_input}"
+# Pangenome PGGB:1 ends here
+
+# [[file:../../main.org::*Get distance][Get distance:1]]
+rule get_distance_metrics:
+    input:
+        pggb_out = join_path('results', results_dir, 'pggb', 'out'),
+    output:
+        distance_tsv = join_path('results', results_dir, 'pggb', 'distance_matrix.tsv'),
+    threads:
+        get_cores_perc(1)
+    conda:
+        '../envs/pggb_env.yaml'
+    shell:
+        "odgi paths -t {threads} -d -i {input.pggb_out}/*.smooth.final.og > {output.distance_tsv}"
+# Get distance:1 ends here

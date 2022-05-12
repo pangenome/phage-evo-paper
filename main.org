@@ -666,7 +666,7 @@ rule polishing_graphaligner_minia:
         minia_assembly_gfa = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.gfa'),
     output:
         minia_gaf = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.gaf'),
-        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa.gz'),
+        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa'),
     threads:
         get_cores_perc(0.3)
     params:
@@ -682,48 +682,27 @@ rule polishing_graphaligner_minia:
 #+END_SRC
 
 **** TODO Add graphaligner to pggb_env
-** relative_abundace
-*** Filter by length
-#+BEGIN_SRC snakemake
-rule filter_by_length_and_index:
-    input:
-        minia_assembly_gfa_polished = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished.gfa'),
-        script = join_path(snakefile_path, 'scripts', 'filter_by_length.py')
-    output:
-        minia_assembly_polished_filtered = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + ".fa.gz"),
-        fai = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + ".fa.gz.fai"),
-        gzi = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + ".fa.gz.gzi"),
-    params:
-        ,**config['params']['minia']
-    conda:
-        '../envs/bio_env.yaml'
-    threads:
-        10
-    shell:
-        "python3 {input.script} {input.minia_assembly_gfa_polished} {params.min_contig_lenght}  {params.max_contig_lenght} | bgzip > {output.minia_assembly_polished_filtered} && "
-        "samtools faidx {output.minia_assembly_polished_filtered}"
-#+END_SRC
-**** TODO ADD samtools to bio_env or add biopython to pggb_env
 *** Sample 1000
 #+BEGIN_SRC snakemake
 rule sample_genomes:
     input:
-        minia_assembly_polished_filtered = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + ".fa.gz"),
+        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa'),
     output:
-        sampled_genomes = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + '.sample1k.fa.gz' ),
+        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.fa.gz' ),
     params:
         sample_size = 100
     threads:
-        5
+        4
     shell:
-        "samtools faidx {input.minia_assembly_polished_filtered} $(zgrep '>' {input.minia_assembly_polished_filtered} | sed 's/>//' | shuf -n {params.sample_size}) | "
-        "gzip > {output.sampled_genomes}"
+        "bgzip -@ {threads} {input.polished_reads} && "
+        "samtools faidx {input.polished_reads}.gz $(zgrep '>' {input.polished_reads}.gz | sed 's/>//' | shuf -n {params.sample_size}) | "
+        "bgzip > {output.polished_reads}"
 #+END_SRC
 *** Merge samples
 #+BEGIN_SRC snakemake
 rule merge_samples_and_parental_genomes:
     input:
-        sampled_genomes = expand(join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + '.sample1k.fa.gz' ), sample=SAMPLES),
+        polished_reads = expand(join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.fa.gz' ), sample=SAMPLES),
         ecoli_and_phages = config['data']['genomes']['ecoli_and_phages'],
     output:
         pggb_input = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz'),
@@ -734,7 +713,7 @@ rule merge_samples_and_parental_genomes:
     threads:
         get_cores_perc(1)
     shell:
-        "cat {input.ecoli_and_phages} <(zcat {input.sampled_genomes}) | bgzip -@ {threads} > {output.pggb_input} && "
+        "cat {input.ecoli_and_phages} <(zcat {input.polished_reads}) | bgzip -@ {threads} > {output.pggb_input} && "
         "samtools faidx {output.pggb_input}"
 #+END_SRC
 *** Pangenome PGGB
@@ -771,6 +750,7 @@ rule get_distance_metrics:
         "odgi paths -t {threads} -d -i {input.pggb_out}/*.smooth.final.og > {output.distance_tsv}"
 #+END_SRC
 
+** relative_abundace
 
 * CONFIGS
 :PROPERTIES:
