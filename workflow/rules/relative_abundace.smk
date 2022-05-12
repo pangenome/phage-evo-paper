@@ -158,3 +158,19 @@ rule get_distance_metrics:
     shell:
         "odgi paths -t {threads} -d -i {input.pggb_out}/*.smooth.final.og > {output.distance_tsv}"
 # Get distance:1 ends here
+
+# [[file:../../main.org::*Plot phylogeny][Plot phylogeny:1]]
+rule plot_phylogeny:
+    input:
+        distance_tsv = join_path('results', results_dir, 'pggb', 'distance_matrix.tsv'),
+        script_phylogeny = join_path(snakefile_path, 'scripts', 'phylogeny.R'),
+    output:
+        rectangular = join_path('results', results_dir, 'plots', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
+        daylight = join_path('results', results_dir, 'plots', 'ggtree.ecoli.phages.passages.daylight.pdf'),
+    conda:
+        '../envs/R_env.yaml'
+    threads:
+        1
+    shell:
+        "Rscript {input.script_phylogeny} {input.distance_tsv} {output.rectangular}"
+# Plot phylogeny:1 ends here
