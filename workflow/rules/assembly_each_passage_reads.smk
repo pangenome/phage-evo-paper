@@ -51,15 +51,16 @@ rule minia:
     output:
         minia_assembly =  join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.fa'),
     threads:
-        get_cores_perc(0.1)
+        4
     params:
         **config['params']['minia'],
     conda:
         '../envs/minia_env.yaml'
     shell:
-        "RELATIVE_ABUNDACE=$( {input.script_abundance} {params.P1_abundance} {params.P1_bp} {input.prefixed} | cut -f1 -d '.') && "
-        "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min $RELATIVE_ABUNDACE -out $(echo {output.minia_assembly} | sed 's/.contigs.fa//') -in {input.prefixed} && "
-        " find $( dirname {output.minia_assembly} ) -type f ! -name '*'$(basename {output.minia_assembly}) -exec rm {{}} \;"
+        "RELATIVE_ABUNDACE=$( {input.script_abundance} {params.P1_abundance} {params.P1_bp} {input.prefixed} ) && "
+        "minia -nb-cores {params.cores} -kmer-size {params.kmer} -abundance-min $RELATIVE_ABUNDACE "
+        "-out $(echo {output.minia_assembly} | sed 's/.contigs.fa//') -in {input.prefixed} && "
+        "find $( dirname {output.minia_assembly} ) -type f ! -name '*'$(basename {output.minia_assembly}) -exec rm {{}} \;"
 # Minia assembly:1 ends here
 
 # [[file:../../main.org::*fasta to gfa][fasta to gfa:1]]
@@ -74,7 +75,7 @@ rule minia_fasta_to_gfa:
     conda:
         '../envs/minia_env.yaml'
     threads:
-        1
+        10
     shell:
         "python {input.script} {input.minia_assembly} {output.minia_assembly_gfa} {params.kmer}"
 # fasta to gfa:1 ends here
@@ -121,22 +122,22 @@ rule filter_by_length_and_index:
 # [[file:../../main.org::*Sample 1000][Sample 1000:1]]
 rule sample_genomes:
     input:
-        minia_assembly_polished_filtered = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + ".fa.gz"),
+        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa.gz'),
     output:
-        sampled_genomes = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + '.sample1k.fa.gz' ),
+        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.fa.gz' ),
     params:
-        sample_size = config['sample_size']
+        sample_size = 100
     threads:
-        1
+        4
     shell:
-        "samtools faidx {input.minia_assembly_polished_filtered} $(zgrep '>' {input.minia_assembly_polished_filtered} | sed 's/>//' | shuf -n {params.sample_size}) | "
-        "gzip > {output.sampled_genomes}"
+        "samtools faidx {input.polished_reads} $(zgrep '>' {input.polished_reads} | sed 's/>//' | cut -d ' ' -f1 | shuf -n {params.sample_size}) | "
+        "bgzip > {output.polished_reads}"
 # Sample 1000:1 ends here
 
 # [[file:../../main.org::*Merge samples][Merge samples:1]]
 rule merge_samples_and_parental_genomes:
     input:
-        sampled_genomes = expand(join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished' + filter_contigs_prefix + '.sample1k.fa.gz' ), sample=SAMPLES),
+        polished_reads = expand(join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.fa.gz' ), sample=SAMPLES),
         ecoli_and_phages = config['data']['genomes']['ecoli_and_phages'],
     output:
         pggb_input = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz'),
@@ -147,7 +148,7 @@ rule merge_samples_and_parental_genomes:
     threads:
         get_cores_perc(1)
     shell:
-        "cat {input.ecoli_and_phages} <(zcat {input.sampled_genomes}) | bgzip -@ {threads} > {output.pggb_input} && "
+        "cat {input.ecoli_and_phages} <(zcat {input.polished_reads}) | bgzip -@ {threads} > {output.pggb_input} && "
         "samtools faidx {output.pggb_input}"
 # Merge samples:1 ends here
 

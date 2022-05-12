@@ -77,7 +77,8 @@ rule polishing_graphaligner_minia:
         minia_assembly_gfa = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.gfa'),
     output:
         minia_gaf = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.gaf'),
-        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa'),
+        polished_reads_fasta = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa'),
+        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa.gz'),
     threads:
         get_cores_perc(0.3)
     params:
@@ -89,13 +90,14 @@ rule polishing_graphaligner_minia:
         "GraphAligner -g {input.minia_assembly_gfa} -f {input.filtered} -x {params.dbtype} "
         "--threads {threads} --seeds-minimizer-length {params.seed_minimizer} "
         "--seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minia_gaf} "
-        "--corrected-out {output.polished_reads}"
+        "--corrected-out {output.polished_reads_fasta} && "
+        "cat {output.polished_reads_fasta} | bgzip -@ {threads} > {output.polished_reads}"
 # Graphaligner MINIA:1 ends here
 
 # [[file:../../main.org::*Sample 1000][Sample 1000:1]]
 rule sample_genomes:
     input:
-        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa'),
+        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa.gz'),
     output:
         polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.fa.gz' ),
     params:
@@ -103,8 +105,7 @@ rule sample_genomes:
     threads:
         4
     shell:
-        "bgzip -@ {threads} {input.polished_reads} && "
-        "samtools faidx {input.polished_reads}.gz $(zgrep '>' {input.polished_reads}.gz | sed 's/>//' | shuf -n {params.sample_size}) | "
+        "samtools faidx {input.polished_reads} $(zgrep '>' {input.polished_reads} | sed 's/>//' | cut -d ' ' -f1 | shuf -n {params.sample_size}) | "
         "bgzip > {output.polished_reads}"
 # Sample 1000:1 ends here
 

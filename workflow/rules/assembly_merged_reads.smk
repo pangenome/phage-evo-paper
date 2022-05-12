@@ -85,23 +85,25 @@ rule minia_fasta_to_gfa:
 # [[file:../../main.org::*Graphaligner MINIA][Graphaligner MINIA:1]]
 rule polishing_graphaligner_minia:
     input:
-        samples_prefixed_gzipped = join_path(config['data']['reads'], 'prefixed', '{sample}.prefixed.fastq.gz'),
-        minia_assembly_gfa = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.gfa')
+        filtered = join_path(config['data']['reads'], 'filtered', '{sample}.filtered.fastq.gz'),
+        minia_assembly_gfa = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.gfa'),
     output:
-        minia_gaf = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished.gaf'),
-        minia_assembly_gfa_polished = join_path('results', results_dir, 'minia', '{sample}', '{sample}.contigs.polished.fa'),
+        minia_gaf = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.gaf'),
+        polished_reads_fasta = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa'),
+        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa.gz'),
     threads:
-        get_cores_perc(1)
+        get_cores_perc(0.3)
     params:
         dbtype = "vg",
         seed_minimizer = 15
     conda:
         '../envs/graphaligner_env.yaml'
     shell:
-        "GraphAligner -g {input.minia_assembly_gfa} -f {input.samples_prefixed_gzipped} -x {params.dbtype} "
+        "GraphAligner -g {input.minia_assembly_gfa} -f {input.filtered} -x {params.dbtype} "
         "--threads {threads} --seeds-minimizer-length {params.seed_minimizer} "
-        "--seeds-minimizer-windowsize {params.seed_minimizer} "
-        "-a {output.minia_gaf} --corrected-out {output.minia_assembly_gfa_polished}"
+        "--seeds-minimizer-windowsize {params.seed_minimizer} -a {output.minia_gaf} "
+        "--corrected-out {output.polished_reads_fasta} && "
+        "cat {output.polished_reads_fasta} | bgzip -@ {threads} > {output.polished_reads}"
 # Graphaligner MINIA:1 ends here
 
 # [[file:../../main.org::*Filter by length][Filter by length:1]]
