@@ -1,5 +1,5 @@
 # [[file:../../main.org::*config][config:1]]
-results_dir = os.path.basename(workflow.snakefile).replace('.smk', '')
+# results_dir = os.path.basename(workflow.snakefile).replace('.smk', '')
 # config:1 ends here
 
 # [[file:../../main.org::*Prefix reads][Prefix reads:1]]
@@ -94,20 +94,20 @@ rule polishing_graphaligner_minia:
         "cat {output.polished_reads_fasta} | bgzip -@ {threads} > {output.polished_reads}"
 # Graphaligner MINIA:1 ends here
 
-# [[file:../../main.org::*Sample 1000][Sample 1000:1]]
+# [[file:../../main.org::*Sample genomes][Sample genomes:1]]
 rule sample_genomes:
     input:
         polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa.gz'),
     output:
         polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.fa.gz' ),
     params:
-        sample_size = 100
+        sample_size = config['sample_size']
     threads:
         4
     shell:
         "samtools faidx {input.polished_reads} $(zgrep '>' {input.polished_reads} | sed 's/>//' | cut -d ' ' -f1 | shuf -n {params.sample_size}) | "
         "bgzip > {output.polished_reads}"
-# Sample 1000:1 ends here
+# Sample genomes:1 ends here
 
 # [[file:../../main.org::*Merge samples][Merge samples:1]]
 rule merge_samples_and_parental_genomes:
@@ -143,7 +143,7 @@ rule pggb_pangenome:
         '../envs/pggb_env.yaml'
     shell:
         "n_mappings=$( zgrep -c '>' {input.pggb_input} ) && "
-        "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -t {threads} -o {output.pggb_out} -i {input.pggb_input}"
+        "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -k {params.min_match_len} -t {threads} -o {output.pggb_out} -i {input.pggb_input}"
 # Pangenome PGGB:1 ends here
 
 # [[file:../../main.org::*Get distance][Get distance:1]]

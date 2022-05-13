@@ -78,6 +78,14 @@ configfile: 'config/config.yaml'
 get_cores_perc = lambda perc: max(1, workflow.cores * perc)
 join_path = lambda *args: os.path.join(*args)
 get_Kbs = lambda x: int(x/1_000)
+
+def get_current_HEAD_hash(default='unnamed'):
+    shell_CL = "git show-ref --head --heads --abbrev | grep HEAD | awk '{print $1}'"
+    with os.popen(shell_CL) as f:
+        git_hash = f.read().strip()
+        if re.match('^[\w\d]{7}$', git_hash):
+            return git_hash
+        return default
 #+END_SRC
 
 ** GLOBAL VARIABLES
@@ -94,12 +102,14 @@ filter_contigs_prefix = '.min{}Kb.max{}Kb'.format(*iter(map(get_Kbs, itget('min_
 
 SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fastq'))
 
+# results_dir = config.get('results_dir', 'results')
+results_dir = get_current_HEAD_hash()
 #+END_SRC
 ** MAIN RULE ALL
 #+BEGIN_SRC snakemake
 rule all:
     input:
-        distance_tsv = join_path('results', 'relative_abundace', 'pggb', 'distance_matrix.tsv'),
+        rectangular = join_path('results', results_dir, 'plots', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
 #+END_SRC
 
 ** Include
@@ -588,7 +598,7 @@ rule minia_fasta_to_gfa:
 :END:
 *** config
 #+BEGIN_SRC snakemake
-results_dir = os.path.basename(workflow.snakefile).replace('.smk', '')
+# results_dir = os.path.basename(workflow.snakefile).replace('.smk', '')
 #+END_SRC
 *** Prefix reads
 #+BEGIN_SRC snakemake
@@ -687,7 +697,7 @@ rule polishing_graphaligner_minia:
 #+END_SRC
 
 **** TODO Add graphaligner to pggb_env
-*** Sample 1000
+*** Sample genomes
 #+BEGIN_SRC snakemake
 rule sample_genomes:
     input:
@@ -695,7 +705,7 @@ rule sample_genomes:
     output:
         polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.fa.gz' ),
     params:
-        sample_size = 100
+        sample_size = config['sample_size']
     threads:
         4
     shell:
@@ -737,7 +747,7 @@ rule pggb_pangenome:
         '../envs/pggb_env.yaml'
     shell:
         "n_mappings=$( zgrep -c '>' {input.pggb_input} ) && "
-        "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -t {threads} -o {output.pggb_out} -i {input.pggb_input}"
+        "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -k {params.min_match_len} -t {threads} -o {output.pggb_out} -i {input.pggb_input}"
 #+END_SRC
 *** Get distance
 #+BEGIN_SRC snakemake
@@ -816,10 +826,10 @@ params:
     keep_percent: 90
     min_length: 10_000
   pggb:
-    minia_sample_size: 1_000
-    map_pct_id: 90
-    segment_length: 1_000
-    block_length: 0
+    map_pct_id: 95
+    segment_length: 500
+    block_length: 1_000
+    min_match_len: 256
   seqkit:
     min: 40_000
     max: 50_000
@@ -860,3 +870,12 @@ DONE: workflow/envs/kmergenie_env.yaml
 DONE: workflow/envs/minia_env.yaml
 DONE: workflow/envs/nanoplot_env.yaml
 #+end_src
+* Notes
+- Some tools cannot be built through conda only:
+  - R: that are some libs that must be isntall manually on the R console:
+    - remotes::install_github("YuLab-SMU/ggtree")
+    - install.packages("stringi",dep=TRUE)
+    - devtools::install_github("tidyverse/tidyr")
+  - PGGB: Works better if installed through GUIX
+-
+** TODO Make a docker container with conda and GUIX

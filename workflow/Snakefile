@@ -13,6 +13,14 @@ configfile: 'config/config.yaml'
 get_cores_perc = lambda perc: max(1, workflow.cores * perc)
 join_path = lambda *args: os.path.join(*args)
 get_Kbs = lambda x: int(x/1_000)
+
+def get_current_HEAD_hash(default='unnamed'):
+    shell_CL = "git show-ref --head --heads --abbrev | grep HEAD | awk '{print $1}'"
+    with os.popen(shell_CL) as f:
+        git_hash = f.read().strip()
+        if re.match('^[\w\d]{7}$', git_hash):
+            return git_hash
+        return default
 # FUNCTIONS:1 ends here
 
 # [[file:../main.org::*GLOBAL VARIABLES][GLOBAL VARIABLES:1]]
@@ -27,12 +35,15 @@ pggb_prefix=".p{}.s{}.l{}".format(*itget("map_pct_id", "segment_length", "block_
 filter_contigs_prefix = '.min{}Kb.max{}Kb'.format(*iter(map(get_Kbs, itget('min_contig_lenght', 'max_contig_lenght')(config['params']['minia']))))
 
 SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fastq'))
+
+# results_dir = config.get('results_dir', 'results')
+results_dir = get_current_HEAD_hash()
 # GLOBAL VARIABLES:1 ends here
 
 # [[file:../main.org::*MAIN RULE ALL][MAIN RULE ALL:1]]
 rule all:
     input:
-        distance_tsv = join_path('results', 'relative_abundace', 'pggb', 'distance_matrix.tsv'),
+        rectangular = join_path('results', results_dir, 'plots', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
 # MAIN RULE ALL:1 ends here
 
 # [[file:../main.org::*Include][Include:1]]

@@ -39,10 +39,10 @@ params:
     keep_percent: 90
     min_length: 10_000
   pggb:
-    minia_sample_size: 1_000
-    map_pct_id: 90
-    segment_length: 1_000
-    block_length: 0
+    map_pct_id: 95
+    segment_length: 500
+    block_length: 1_000
+    min_match_len: 256
   seqkit:
     min: 40_000
     max: 50_000
