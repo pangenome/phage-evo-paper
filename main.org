@@ -703,7 +703,7 @@ rule sample_genomes:
     input:
         polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa.gz'),
     output:
-        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.fa.gz' ),
+        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.' + str(config['sample_size']) + '.fa.gz' ),
     params:
         sample_size = config['sample_size']
     threads:
@@ -716,7 +716,7 @@ rule sample_genomes:
 #+BEGIN_SRC snakemake
 rule merge_samples_and_parental_genomes:
     input:
-        polished_reads = expand(join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.fa.gz' ), sample=SAMPLES),
+        polished_reads = expand(join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.' + str(config['sample_size']) + '.fa.gz' ), sample=SAMPLES),
         ecoli_and_phages = config['data']['genomes']['ecoli_and_phages'],
     output:
         pggb_input = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz'),
