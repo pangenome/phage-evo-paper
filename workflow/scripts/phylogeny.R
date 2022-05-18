@@ -35,6 +35,7 @@ y.tree <- nj(as.dist(y.dist[, !names(y.dist) %in% c("path.a")]))
 
 group.info <- split(y.tree$tip.label, gsub("#.+", "", y.tree$tip.label))
 y.tree <- groupOTU(y.tree, group.info)
+
 ggtree(y.tree, branch.length = 'none') + geom_tippoint(aes(color=group), size=1) +
   scale_color_manual('Passages' , values=phage.colors)
 

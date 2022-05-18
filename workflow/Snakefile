@@ -43,7 +43,8 @@ results_dir = get_current_HEAD_hash()
 # [[file:../main.org::*MAIN RULE ALL][MAIN RULE ALL:1]]
 rule all:
     input:
-        rectangular = join_path('results', results_dir, 'plots', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
+        rectangular_odgi = join_path('results', results_dir, 'plots', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
+        rectangular_fastani = join_path('results', results_dir, 'plots','fastani', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
 # MAIN RULE ALL:1 ends here
 
 # [[file:../main.org::*Include][Include:1]]

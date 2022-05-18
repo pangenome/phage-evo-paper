@@ -115,9 +115,9 @@ rule merge_samples_and_parental_genomes:
         polished_reads = expand(join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.' + str(config['sample_size']) + '.fa.gz' ), sample=SAMPLES),
         ecoli_and_phages = config['data']['genomes']['ecoli_and_phages'],
     output:
-        pggb_input = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz'),
-        fai = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz.fai'),
-        gzi = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz.gzi'),
+        pggb_input = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz'),
+        fai = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz.fai'),
+        gzi = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz.gzi'),
     conda:
         '../envs/pggb_env.yaml'
     threads:
@@ -130,9 +130,9 @@ rule merge_samples_and_parental_genomes:
 # [[file:../../main.org::*Pangenome PGGB][Pangenome PGGB:1]]
 rule pggb_pangenome:
     input:
-        pggb_input = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz'),
-        fai = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz.fai'),
-        gzi = join_path('results', results_dir, 'pggb', 'minia.merged.1K.sample.fa.gz.gzi'),
+        pggb_input = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz'),
+        fai = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz.fai'),
+        gzi = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz.gzi'),
     output:
         pggb_out = directory(join_path('results', results_dir, 'pggb', 'out')),
     params:
@@ -143,7 +143,7 @@ rule pggb_pangenome:
         '../envs/pggb_env.yaml'
     shell:
         "n_mappings=$( zgrep -c '>' {input.pggb_input} ) && "
-        "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -k {params.min_match_len} -t {threads} -o {output.pggb_out} -i {input.pggb_input}"
+        "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -k {params.min_match_len} -B {params.transclose_batch} -t {threads} -o {output.pggb_out} -i {input.pggb_input}"
 # Pangenome PGGB:1 ends here
 
 # [[file:../../main.org::*Get distance][Get distance:1]]
@@ -151,7 +151,7 @@ rule get_distance_metrics:
     input:
         pggb_out = join_path('results', results_dir, 'pggb', 'out'),
     output:
-        distance_tsv = join_path('results', results_dir, 'pggb', 'distance_matrix.tsv'),
+        distance_tsv = join_path('results', results_dir, 'pggb', 'distance_matrix.sample.' + str(config['sample_size']) + '.tsv'),
     threads:
         get_cores_perc(1)
     conda:
@@ -163,7 +163,7 @@ rule get_distance_metrics:
 # [[file:../../main.org::*Plot phylogeny][Plot phylogeny:1]]
 rule plot_phylogeny:
     input:
-        distance_tsv = join_path('results', results_dir, 'pggb', 'distance_matrix.tsv'),
+        distance_tsv = join_path('results', results_dir, 'pggb', 'distance_matrix.sample.' + str(config['sample_size']) + '.tsv'),
         script_phylogeny = join_path(snakefile_path, 'scripts', 'phylogeny.R'),
     output:
         rectangular = join_path('results', results_dir, 'plots', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
@@ -175,3 +175,53 @@ rule plot_phylogeny:
     shell:
         "Rscript {input.script_phylogeny} {input.distance_tsv} {output.rectangular}"
 # Plot phylogeny:1 ends here
+
+# [[file:../../main.org::*Split_multifasta][Split_multifasta:1]]
+rule split_multifasta:
+    input:
+        pggb_input = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz'),
+        fai = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz.fai'),
+        gzi = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz.gzi'),
+    output:
+        split_fastas_paths = join_path('results', results_dir, 'split_fastas_sample' + str(config['sample_size']), 'all_fastas_paths.txt')
+    conda:
+        '../envs/pggb_env'
+    threads:
+        1
+    shell:
+        "fasta_dir=$(dirname {output.split_fastas_paths}) && "
+        "zgrep '>' {input.pggb_input} | sed 's/>//' | "
+        "while read f; do samtools faidx {input.pggb_input} $f > ${{fasta_dir}}/${{f}}.fa; done && "
+        "find $fasta_dir -name '*.fa' -exec readlink -f {{}} \; > {output.split_fastas_paths}"
+# Split_multifasta:1 ends here
+
+# [[file:../../main.org::*FASTANI_DISTANCE][FASTANI_DISTANCE:1]]
+rule fastaANI_distance_matrix:
+    input:
+        split_fastas_paths = join_path('results', results_dir, 'split_fastas_sample' + str(config['sample_size']), 'all_fastas_paths.txt')
+    output:
+        fastani_distance_matrix = join_path('results', results_dir, 'plots','fastani', 'fastani_distance_matrix.tsv'),
+    conda:
+        '../envs/fastani_env.yaml'
+    threads:
+        get_cores_perc(1)
+    shell:
+        "fastANI  -t {threads} --fragLen 200 --ql {input.split_fastas_paths} --rl {input.split_fastas_paths} -o /dev/stdout  | "
+        "sed -r 's#'$(readlink -f {input.split_fastas_paths} | xargs dirname )'##g;s#.fa##g' | awk -v OFS='\\t' '{{print $1,$2,$3}}' >{output.fastani_distance_matrix}"
+# FASTANI_DISTANCE:1 ends here
+
+# [[file:../../main.org::*FASTANI_PLOT][FASTANI_PLOT:1]]
+rule fastANI_plot_tree:
+    input:
+        fastani_distance_matrix = join_path('results', results_dir, 'plots','fastani', 'fastani_distance_matrix.tsv'),
+        script_phylogeny_fastani = join_path(snakefile_path, 'scripts', 'phylogeny_fastani.R'),
+    output:
+        rectangular = join_path('results', results_dir, 'plots','fastani', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
+        daylight = join_path('results', results_dir, 'plots','fastani', 'ggtree.ecoli.phages.passages.daylight.pdf'),
+    conda:
+        '../envs/R_envs.yaml'
+    threads:
+        1
+    shell:
+        'Rscript {input.script_phylogeny_fastani} {input.fastani_distance_matrix} {output.rectangular}'
+# FASTANI_PLOT:1 ends here

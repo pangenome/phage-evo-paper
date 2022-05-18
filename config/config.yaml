@@ -5,7 +5,7 @@
 # reads: 'data/fastq'
 # parental_phages: 'data/genomes/phage/parental.phage.merged.fasta'
 
-sample_size: 10
+sample_size: 3
 
 data:
   reads: 'data/fastq'
@@ -43,6 +43,7 @@ params:
     segment_length: 500
     block_length: 1_000
     min_match_len: 256
+    transclose_batch: 10_000
   seqkit:
     min: 40_000
     max: 50_000
