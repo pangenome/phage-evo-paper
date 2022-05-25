@@ -185,7 +185,7 @@ rule split_multifasta:
     output:
         split_fastas_paths = join_path('results', results_dir, 'split_fastas_sample' + str(config['sample_size']), 'all_fastas_paths.txt')
     conda:
-        '../envs/pggb_env'
+        '../envs/pggb_env.yaml'
     threads:
         1
     shell:
@@ -207,7 +207,7 @@ rule fastaANI_distance_matrix:
         get_cores_perc(1)
     shell:
         "fastANI  -t {threads} --fragLen 200 --ql {input.split_fastas_paths} --rl {input.split_fastas_paths} -o /dev/stdout  | "
-        "sed -r 's#'$(readlink -f {input.split_fastas_paths} | xargs dirname )'##g;s#.fa##g' | awk -v OFS='\\t' '{{print $1,$2,$3}}' >{output.fastani_distance_matrix}"
+        "sed -r 's#'$(readlink -f {input.split_fastas_paths} | xargs dirname )'/##g;s#.fa##g' | awk -v OFS='\\t' '{{print $1,$2,$3}}' >{output.fastani_distance_matrix}"
 # FASTANI_DISTANCE:1 ends here
 
 # [[file:../../main.org::*FASTANI_PLOT][FASTANI_PLOT:1]]
@@ -219,7 +219,7 @@ rule fastANI_plot_tree:
         rectangular = join_path('results', results_dir, 'plots','fastani', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
         daylight = join_path('results', results_dir, 'plots','fastani', 'ggtree.ecoli.phages.passages.daylight.pdf'),
     conda:
-        '../envs/R_envs.yaml'
+        '../envs/R_env.yaml'
     threads:
         1
     shell:

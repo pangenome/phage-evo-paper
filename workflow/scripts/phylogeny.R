@@ -14,15 +14,18 @@ suppressPackageStartupMessages(
 args <- commandArgs(trailingOnly = TRUE)
 input=args[1]
 output=args[2]
+pdf(file=paste(dirname(output), 'Rplots.pdf', sep = '/'))
 
 # Get an color function object that aceppts an interger 
 colfunc <- colorRampPalette(c("red", "yellow"))
 
 # Generate labels for the colors 
-phage.groups <- c('E_coli_LE', 'E_coli_bl21_DE3_polished', 'S1-55L', 'S2-36s', 'S2-55s', paste0('P',1:10))
+# phage.groups <- c('E_coli_LE', 'E_coli_bl21_DE3_polished', 'S1-55L', 'S2-36s', 'S2-55s', paste0('P',1:10))
+phage.groups <- c(paste0('P',1:10))
 
 # Get a list of colors 
-phage.colors <- c(rainbow(8)[3:7], colfunc(10))
+# phage.colors <- c(rainbow(8)[3:7], colfunc(10))
+phage.colors <- c(colfunc(10))
 
 # name the colors with the labels 
 names(phage.colors) <- phage.groups
@@ -40,6 +43,7 @@ ggtree(y.tree, branch.length = 'none') + geom_tippoint(aes(color=group), size=1)
   scale_color_manual('Passages' , values=phage.colors)
 
 ggsave(output, height=40, width=9)
+ 
 
 ggtree(y.tree, branch.length = 'none', layout = 'daylight') + geom_tippoint(aes(color=group), size=1) +
   scale_color_manual('Passages' , values=phage.colors)
