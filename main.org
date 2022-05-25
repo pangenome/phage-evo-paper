@@ -107,8 +107,15 @@ results_dir = get_current_HEAD_hash()
 #+END_SRC
 ** MAIN RULE ALL
 #+BEGIN_SRC snakemake
+def list_files(wildcards, root_dir):
+    ck_output = checkpoints.split_multifasta.get(**wildcards).output[0]
+    CONTIGS, = glob_wildcards(join_path())
+
+
 rule all:
     input:
+        split_fastas_dir = join_path('results', results_dir, 'split_fastas_sample' + str(config['sample_size'])),
+        contigs = get_contig_names
         rectangular_odgi = join_path('results', results_dir, 'plots', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
         rectangular_fastani = join_path('results', results_dir, 'plots','fastani', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
 #+END_SRC
@@ -782,13 +789,14 @@ rule plot_phylogeny:
 #+END_SRC
 *** Split_multifasta
 #+BEGIN_SRC snakemake
-rule split_multifasta:
+checkpoint split_multifasta:
     input:
         pggb_input = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz'),
         fai = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz.fai'),
         gzi = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz.gzi'),
     output:
-        split_fastas_paths = join_path('results', results_dir, 'split_fastas_sample' + str(config['sample_size']), 'all_fastas_paths.txt')
+        split_fastas_dir = join_path('results', results_dir, 'split_fastas_sample' + str(config['sample_size']))
+        # split_fastas_paths = join_path('results', results_dir, 'split_fastas_sample' + str(config['sample_size']), 'all_fastas_paths.txt')
     conda:
         '../envs/pggb_env'
     threads:
@@ -796,8 +804,9 @@ rule split_multifasta:
     shell:
         "fasta_dir=$(dirname {output.split_fastas_paths}) && "
         "zgrep '>' {input.pggb_input} | sed 's/>//' | "
-        "while read f; do samtools faidx {input.pggb_input} $f > ${{fasta_dir}}/${{f}}.fa; done && "
-        "find $fasta_dir -name '*.fa' -exec readlink -f {{}} \; > {output.split_fastas_paths}"
+        "while read f; do samtools faidx {input.pggb_input} $f > ${{fasta_dir}}/${{f}}.fa; done"
+
+        # "find $fasta_dir -name '*.fa' -exec readlink -f {{}} \; > {output.split_fastas_paths}"
 #+END_SRC
 
 *** FASTANI_DISTANCE
@@ -835,6 +844,16 @@ rule fastANI_plot_tree:
         'Rscript {input.script_phylogeny_fastani} {input.fastani_distance_matrix} {output.rectangular}'
 
 #+END_SRC
+*** Annotation
+#+BEGIN_SRC snakemake
+rule annotation:
+    input:
+        split_fastas_paths = join_path('results', results_dir, 'split_fastas_sample' + str(config['sample_size']), 'all_fastas_paths.txt')
+    output:
+
+
+#+END_SRC
+
 
 * CONFIGS
 :PROPERTIES:
