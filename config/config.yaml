@@ -2,13 +2,13 @@
 # data: 'data'
 
 # # Input
-reads: 'data/fastq'
-reads_suffix: '.merged.fastq'
+reads: '/export/erikg/data/phage/reads'
+reads_suffix: '.merged.fastq.gz'
 
 sample_size: 5
 
 data:
-  reads: 'data/fastq'
+  reads: '/export/erikg/data/phage/reads'
   genomes:
     ecoli: 'data/genomes/bacteria/E_coli_bl21_noplasmid.fasta'
     merged: 'data/genomes/bacteria/parental_phages_and_Ecoli_bl21.fasta'
