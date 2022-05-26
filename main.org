@@ -91,39 +91,25 @@ def get_current_HEAD_hash(default='unnamed'):
 ** GLOBAL VARIABLES
 #+BEGIN_SRC snakemake
 snakefile_path = os.path.dirname(workflow.snakefile)
-# SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
 
-# Prefixes
-minia_prefix="minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
-pggb_prefix=".p{}.s{}.l{}".format(*itget("map_pct_id", "segment_length", "block_length")(config['params']['pggb']))
-
-# Suffixes
-filter_contigs_prefix = '.min{}Kb.max{}Kb'.format(*iter(map(get_Kbs, itget('min_contig_lenght', 'max_contig_lenght')(config['params']['minia']))))
-
-SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fastq'))
+SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}' + config['reads_suffix']))
 
 # results_dir = config.get('results_dir', 'results')
-results_dir = get_current_HEAD_hash()
+results_dir = join_path('results', get_current_HEAD_hash())
 #+END_SRC
 ** MAIN RULE ALL
 #+BEGIN_SRC snakemake
-def list_files(wildcards, root_dir):
-    ck_output = checkpoints.split_multifasta.get(**wildcards).output[0]
-    CONTIGS, = glob_wildcards(join_path())
-
-
 rule all:
     input:
-        split_fastas_dir = join_path('results', results_dir, 'split_fastas_sample' + str(config['sample_size'])),
-        contigs = get_contig_names
-        rectangular_odgi = join_path('results', results_dir, 'plots', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
-        rectangular_fastani = join_path('results', results_dir, 'plots','fastani', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
+        plot_dir = expand(join_path('results', results_dir, '{sample}'), sample=SAMPLES),
+        minia_assembly_gfa = expand(join_path(results_dir, 'minia', '{sample}', '{sample}.minia.contigs.gfa'), sample=SAMPLES),
+        putative_phage_genomes_polished = expand(join_path(results_dir, '{sample}', '{sample}' + '.putative_phage_genomes' + '.polished' + '.prefixed' + '.fa.gz'), sample=SAMPLES),
 #+END_SRC
 
 ** Include
 #+BEGIN_SRC snakemake
 include:
-    'rules/relative_abundace.smk'
+    'rules/processing_all_samples.smk'
 #+END_SRC
 
 * Rules
@@ -854,6 +840,78 @@ rule annotation:
 
 #+END_SRC
 
+** Processing two replicates
+:PROPERTIES:
+:COOKIE_DATA: todo recursive
+:header-args: :tangle workflow/rules/processing_all_samples.smk :mkdirp yes :exports none :eval never-export :comments link
+:END:
+*** Plot lengths
+#+BEGIN_SRC snakemake
+rule quality_check_plot:
+    input:
+        reads = join_path(config['data']['reads'], '{sample}' + config['reads_suffix'])
+    output:
+        plot_dir = directory(join_path('results', results_dir, '{sample}'))
+    threads:
+        4
+    conda:
+        "../envs/nanoplot_env.yaml"
+    shell:
+        "NanoPlot -t {threads} --plots dot --fastq {input.reads} -o {output.plot_dir}"
+#+END_SRC
+*** Assembly
+#+BEGIN_SRC snakemake
+rule minia_assembly:
+    input:
+        reads = join_path(config['data']['reads'], '{sample}' + config['reads_suffix']),
+        script_abundance = join_path(snakefile_path, 'scripts', 'get_abundance.sh'),
+        script_fa_to_gfa = join_path(snakefile_path, 'scripts', 'convertToGFA.py'),
+    output:
+        minia_assembly = join_path(results_dir, 'minia', '{sample}', '{sample}.minia.contigs.fa'),
+        minia_assembly_gfa = join_path(results_dir, 'minia', '{sample}', '{sample}.minia.contigs.gfa')
+    params:
+        log_abundance = join_path('logs', '{sample}.abundance.txt'),
+        ,**config['params']['minia'],
+    threads:
+        get_cores_perc(0.1)
+    conda:
+        '../envs/minia_env.yaml'
+    shell:
+        "RELATIVE_ABUNDACE=$( {input.script_abundance} {params.P1_abundance} {params.P1_bp} {input.reads} ) && "
+        'echo "{wildcards.sample},${{RELATIVE_ABUNDACE}}" > {params.log_abundance} && '
+        "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min $RELATIVE_ABUNDACE "
+        "-out $(echo {output.minia_assembly} | sed 's/.contigs.fa//') -in {input.reads} && "
+        "find $( dirname {output.minia_assembly} ) -type f ! -name '*'$(basename {output.minia_assembly}) -exec rm {{}} \; && "
+        "python {input.script_fa_to_gfa} {output.minia_assembly} {output.minia_assembly_gfa} {params.kmer}"
+#+END_SRC
+*** Error correction
+#+BEGIN_SRC snakemake
+rule graphaligner_error_correction:
+    input:
+        reads = join_path(config['data']['reads'], '{sample}' + config['reads_suffix']),
+        minia_assembly_gfa = join_path(results_dir, 'minia', '{sample}', '{sample}.minia.contigs.gfa'),
+    output:
+        putative_phage_genomes = join_path(results_dir, '{sample}', '{sample}' + '.putative_phage_genomes' + '.fastq'),
+        putative_phage_genomes_polished = join_path(results_dir, '{sample}', '{sample}' + '.putative_phage_genomes' + '.polished' + '.prefixed' + '.fa.gz'),
+    params:
+        gam = join_path(results_dir, '{sample}', '{sample}' + '.putative_phage_genomes' + '.polished' + '.gam'),
+        fasta = join_path(results_dir, '{sample}', '{sample}' + '.putative_phage_genomes' + '.polished' + '.fa.gz'),
+        ,**config['params']['seqkit'],
+        ,**config['params']['graphaligner'],
+    threads:
+        get_cores_perc(0.3)
+    conda:
+        '../envs/graphaligner_env.yaml'
+    shell:
+        "seqkit seq {input.reads} -j {threads} -m {params.min} -M {params.max} > {output.putative_phage_genomes} && "
+        "GraphAligner -g {input.minia_assembly_gfa} -f {output.putative_phage_genomes} -x {params.dbtype} "
+        "--threads {threads} --seeds-minimizer-length {params.seed_minimizer} "
+        "--seeds-minimizer-windowsize {params.seed_minimizer} -a {params.gam} "
+        "--corrected-out {params.fasta} && "
+        "sed '/>/ s|>|>{wildcards.sample}#1#|' {params.fasta} | bgzip > {output.putative_phage_genomes_polished} && "
+        "rm {params.gam} {params.fasta}"
+#+END_SRC
+
 
 * CONFIGS
 :PROPERTIES:
@@ -864,10 +922,10 @@ rule annotation:
 # data: 'data'
 
 # # Input
-# reads: 'data/fastq'
-# parental_phages: 'data/genomes/phage/parental.phage.merged.fasta'
+reads: 'data/fastq'
+reads_suffix: '.merged.fastq'
 
-sample_size: 3
+sample_size: 5
 
 data:
   reads: 'data/fastq'
@@ -909,6 +967,9 @@ params:
   seqkit:
     min: 40_000
     max: 50_000
+  graphaligner:
+    dbtype: 'vg'
+    seed_minimizer: 15
 
 # Sample genomes from assembly
 #+END_SRC

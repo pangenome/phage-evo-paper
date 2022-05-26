@@ -177,22 +177,24 @@ rule plot_phylogeny:
 # Plot phylogeny:1 ends here
 
 # [[file:../../main.org::*Split_multifasta][Split_multifasta:1]]
-rule split_multifasta:
+checkpoint split_multifasta:
     input:
         pggb_input = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz'),
         fai = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz.fai'),
         gzi = join_path('results', results_dir, 'pggb', 'minia.merged.' + str(config['sample_size']) + '.sample.fa.gz.gzi'),
     output:
-        split_fastas_paths = join_path('results', results_dir, 'split_fastas_sample' + str(config['sample_size']), 'all_fastas_paths.txt')
+        split_fastas_dir = join_path('results', results_dir, 'split_fastas_sample' + str(config['sample_size']))
+        # split_fastas_paths = join_path('results', results_dir, 'split_fastas_sample' + str(config['sample_size']), 'all_fastas_paths.txt')
     conda:
-        '../envs/pggb_env.yaml'
+        '../envs/pggb_env'
     threads:
         1
     shell:
         "fasta_dir=$(dirname {output.split_fastas_paths}) && "
         "zgrep '>' {input.pggb_input} | sed 's/>//' | "
-        "while read f; do samtools faidx {input.pggb_input} $f > ${{fasta_dir}}/${{f}}.fa; done && "
-        "find $fasta_dir -name '*.fa' -exec readlink -f {{}} \; > {output.split_fastas_paths}"
+        "while read f; do samtools faidx {input.pggb_input} $f > ${{fasta_dir}}/${{f}}.fa; done"
+
+        # "find $fasta_dir -name '*.fa' -exec readlink -f {{}} \; > {output.split_fastas_paths}"
 # Split_multifasta:1 ends here
 
 # [[file:../../main.org::*FASTANI_DISTANCE][FASTANI_DISTANCE:1]]
@@ -207,7 +209,7 @@ rule fastaANI_distance_matrix:
         get_cores_perc(1)
     shell:
         "fastANI  -t {threads} --fragLen 200 --ql {input.split_fastas_paths} --rl {input.split_fastas_paths} -o /dev/stdout  | "
-        "sed -r 's#'$(readlink -f {input.split_fastas_paths} | xargs dirname )'/##g;s#.fa##g' | awk -v OFS='\\t' '{{print $1,$2,$3}}' >{output.fastani_distance_matrix}"
+        "sed -r 's#'$(readlink -f {input.split_fastas_paths} | xargs dirname )'##g;s#.fa##g' | awk -v OFS='\\t' '{{print $1,$2,$3}}' >{output.fastani_distance_matrix}"
 # FASTANI_DISTANCE:1 ends here
 
 # [[file:../../main.org::*FASTANI_PLOT][FASTANI_PLOT:1]]
@@ -219,9 +221,16 @@ rule fastANI_plot_tree:
         rectangular = join_path('results', results_dir, 'plots','fastani', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
         daylight = join_path('results', results_dir, 'plots','fastani', 'ggtree.ecoli.phages.passages.daylight.pdf'),
     conda:
-        '../envs/R_env.yaml'
+        '../envs/R_envs.yaml'
     threads:
         1
     shell:
         'Rscript {input.script_phylogeny_fastani} {input.fastani_distance_matrix} {output.rectangular}'
 # FASTANI_PLOT:1 ends here
+
+# [[file:../../main.org::*Annotation][Annotation:1]]
+rule annotation:
+    input:
+        split_fastas_paths = join_path('results', results_dir, 'split_fastas_sample' + str(config['sample_size']), 'all_fastas_paths.txt')
+    output:
+# Annotation:1 ends here

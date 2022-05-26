@@ -25,29 +25,22 @@ def get_current_HEAD_hash(default='unnamed'):
 
 # [[file:../main.org::*GLOBAL VARIABLES][GLOBAL VARIABLES:1]]
 snakefile_path = os.path.dirname(workflow.snakefile)
-# SAMPLES=list(map(lambda x: os.path.basename(x.path).replace('.fastq',''), filter(lambda x: x.path.endswith('fastq'), os.scandir(config['reads']))))
 
-# Prefixes
-minia_prefix="minia.k{}.a{}".format(*itget("kmer","abundance")(config['params']['minia']))
-pggb_prefix=".p{}.s{}.l{}".format(*itget("map_pct_id", "segment_length", "block_length")(config['params']['pggb']))
-
-# Suffixes
-filter_contigs_prefix = '.min{}Kb.max{}Kb'.format(*iter(map(get_Kbs, itget('min_contig_lenght', 'max_contig_lenght')(config['params']['minia']))))
-
-SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}.merged.fastq'))
+SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}' + config['reads_suffix']))
 
 # results_dir = config.get('results_dir', 'results')
-results_dir = get_current_HEAD_hash()
+results_dir = join_path('results', get_current_HEAD_hash())
 # GLOBAL VARIABLES:1 ends here
 
 # [[file:../main.org::*MAIN RULE ALL][MAIN RULE ALL:1]]
 rule all:
     input:
-        rectangular_odgi = join_path('results', results_dir, 'plots', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
-        rectangular_fastani = join_path('results', results_dir, 'plots','fastani', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
+        plot_dir = expand(join_path('results', results_dir, '{sample}'), sample=SAMPLES),
+        minia_assembly_gfa = expand(join_path(results_dir, 'minia', '{sample}', '{sample}.minia.contigs.gfa'), sample=SAMPLES),
+        putative_phage_genomes_polished = expand(join_path(results_dir, '{sample}', '{sample}' + '.putative_phage_genomes' + '.polished' + '.prefixed' + '.fa.gz'), sample=SAMPLES),
 # MAIN RULE ALL:1 ends here
 
 # [[file:../main.org::*Include][Include:1]]
 include:
-    'rules/relative_abundace.smk'
+    'rules/processing_all_samples.smk'
 # Include:1 ends here

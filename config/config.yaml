@@ -2,10 +2,10 @@
 # data: 'data'
 
 # # Input
-# reads: 'data/fastq'
-# parental_phages: 'data/genomes/phage/parental.phage.merged.fasta'
+reads: 'data/fastq'
+reads_suffix: '.merged.fastq'
 
-sample_size: 100
+sample_size: 5
 
 data:
   reads: 'data/fastq'
@@ -47,6 +47,9 @@ params:
   seqkit:
     min: 40_000
     max: 50_000
+  graphaligner:
+    dbtype: 'vg'
+    seed_minimizer: 15
 
 # Sample genomes from assembly
 # CONFIGS:1 ends here
