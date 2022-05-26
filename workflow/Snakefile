@@ -37,7 +37,10 @@ rule all:
     input:
         plot_dir = expand(join_path(results_dir, 'nanoplot', '{sample}'), sample=SAMPLES),
         putative_phage_genomes_polished = expand(join_path(results_dir, 'minia', '{sample}', '{sample}' + '.putative_phage_genomes' + '.polished' + '.prefixed' + '.fa.gz'), sample=SAMPLES),
-        pggb_input = join_path(results_dir, 'pggb', 'genomes.sample_' + str(config['sample_size']) + '_from_each_passage.fa.gz')
+        pggb_input = join_path(results_dir, 'pggb', 'genomes.sample_' + str(config['sample_size']) + '_from_each_passage.fa.gz'),
+        fastani_distance_matrix = join_path(results_dir, 'fastani', 'fastani_distance_matrix.tsv'),
+        pggb_out = join_path(results_dir, 'pggb', 'sample_' + str(config['sample_size']) ),
+        distance_tsv = join_path(results_dir, 'pggb', 'distance_matrix.sample.' + str(config['sample_size']) + '.tsv' ),
 # MAIN RULE ALL:1 ends here
 
 # [[file:../main.org::*Include][Include:1]]

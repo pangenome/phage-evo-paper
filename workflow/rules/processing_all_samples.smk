@@ -83,3 +83,54 @@ rule merge_and_sample:
         "samtools faidx $f $( zgrep -Po '(?<=^\>).+' $f | shuf -n {params.sample_size} ) >> {params.fasta}; done && "
         'bgzip -@ {threads} {params.fasta} && samtools faidx {output.pggb_input} '
 # Sample and merge:1 ends here
+
+# [[file:../../main.org::*Fastani][Fastani:1]]
+rule fastaANI_distance_matrix:
+    input:
+        pggb_input = join_path(results_dir, 'pggb', 'genomes.sample_' + str(config['sample_size']) + '_from_each_passage.fa.gz')
+    output:
+        split_fastas = directory(join_path(results_dir, 'split_fasta_' + str(config['sample_size']) )),
+        fastani_distance_matrix = join_path(results_dir, 'fastani', 'fastani_distance_matrix.tsv'),
+    params:
+        list_of_files = join_path(results_dir, 'split_fasta_' + str(config['sample_size']), 'list_of_files.txt' )
+    conda:
+        '../envs/fastani_env.yaml'
+    threads:
+        get_cores_perc(1)
+    shell:
+        'seqkit split -O {output.split_fastas} --by-id {input.pggb_input} && '
+        "find {output.split_fastas} -name '*fa.gz' -exec readlink -f {{}} \; > {output.fastani_distance_matrix} && "
+        'fastANI -t {threads} --fragLen 200 --ql {params.list_of_files} --rl {params.list_of_files} -o /dev/stdout  | '
+        "perl -pe 's|/.*?id_||g;s|.fa.gz||g' | awk -v OFS='\\t' '{{print $1,$2,$3}}' >{output.fastani_distance_matrix}"
+# Fastani:1 ends here
+
+# [[file:../../main.org::*PGGB][PGGB:1]]
+rule pggb_pangenome:
+    input:
+        pggb_input = join_path(results_dir, 'pggb', 'genomes.sample_' + str(config['sample_size']) + '_from_each_passage.fa.gz')
+    output:
+        pggb_out = directory(join_path(results_dir, 'pggb', 'sample_' + str(config['sample_size']) ))
+    params:
+        **config['params']['pggb']
+    threads:
+        get_cores_perc(1)
+    conda:
+        '../envs/pggb_env.yaml'
+    shell:
+        "n_mappings=$( zgrep -c '>' {input.pggb_input} ) && "
+        "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -k {params.min_match_len} -B {params.transclose_batch} -t {threads} -o {output.pggb_out} -i {input.pggb_input}"
+# PGGB:1 ends here
+
+# [[file:../../main.org::*odgi distance matrix][odgi distance matrix:1]]
+rule get_distance_metrics:
+    input:
+        pggb_out = join_path(results_dir, 'pggb', 'sample_' + str(config['sample_size']) )
+    output:
+        distance_tsv = join_path(results_dir, 'pggb', 'distance_matrix.sample.' + str(config['sample_size']) + '.tsv' )
+    threads:
+        get_cores_perc(1)
+    conda:
+        '../envs/pggb_env.yaml'
+    shell:
+        "odgi paths -t {threads} -d -i {input.pggb_out}/*.smooth.final.og > {output.distance_tsv}"
+# odgi distance matrix:1 ends here
