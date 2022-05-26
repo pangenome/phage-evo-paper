@@ -12,4 +12,4 @@ bp=$2           # Total bases of the P1 assembly
 fastq_input=$3  # Input BGZIPPED fastq file 
 
 echo "${abundance}" "$(fastq_count_bases $fastq_input)" "${bp}" \
-    | awk '{print ($1*$2)/$3}' # prints an abundance relative to P1
+    | awk '{h=($1*$2)/$3; h=int(h); if ( h < 3) print 3; else print h}'
