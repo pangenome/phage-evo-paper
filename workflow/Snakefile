@@ -36,8 +36,8 @@ results_dir = join_path('results', get_current_HEAD_hash())
 rule all:
     input:
         plot_dir = expand(join_path(results_dir, 'nanoplot', '{sample}'), sample=SAMPLES),
-        minia_assembly_gfa = expand(join_path(results_dir, 'minia', '{sample}', '{sample}.minia.contigs.gfa'), sample=SAMPLES),
         putative_phage_genomes_polished = expand(join_path(results_dir, 'minia', '{sample}', '{sample}' + '.putative_phage_genomes' + '.polished' + '.prefixed' + '.fa.gz'), sample=SAMPLES),
+        pggb_input = join_path(results_dir, 'pggb', 'genomes.sample_' + str(config['sample_size']) + '_from_each_passage.fa.gz')
 # MAIN RULE ALL:1 ends here
 
 # [[file:../main.org::*Include][Include:1]]

@@ -63,3 +63,23 @@ rule graphaligner_error_correction:
         "sed -r '/>/ s|>|>{wildcards.sample}#1#|;s|\s.+||' {params.fasta} | bgzip > {output.putative_phage_genomes_polished} && "
         "rm {params.gam} {params.fasta}"
 # Error correction:1 ends here
+
+# [[file:../../main.org::*Sample and merge][Sample and merge:1]]
+rule merge_and_sample:
+    input:
+        putative_phage_genomes_polished = expand(join_path(results_dir, 'minia', '{sample}', '{sample}' + '.putative_phage_genomes' + '.polished' + '.prefixed' + '.fa.gz'), sample=SAMPLES),
+    output:
+        pggb_input = join_path(results_dir, 'pggb', 'genomes.sample_' + str(config['sample_size']) + '_from_each_passage.fa.gz')
+    params:
+        fasta = join_path(results_dir, 'pggb', 'genomes.sample_' + str(config['sample_size']) + '_from_each_passage.fa'),
+        sample_size = config['sample_size']
+    threads:
+        get_cores_perc(0.5)
+    conda:
+        '../envs/graphaligner_env.yaml'
+    shell:
+        '> {params.fasta} && '
+        'for f in {input.putative_phage_genomes_polished}; do '
+        "samtools faidx $f $( zgrep -Po '(?<=^\>).+' $f | shuf -n {params.sample_size} ) >> {params.fasta}; done && "
+        'bgzip -@ {threads} {params.fasta} && samtools faidx {output.pggb_input} '
+# Sample and merge:1 ends here
