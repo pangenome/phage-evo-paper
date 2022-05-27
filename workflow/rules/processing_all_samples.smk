@@ -99,7 +99,7 @@ rule fastaANI_distance_matrix:
         get_cores_perc(1)
     shell:
         'seqkit split -O {output.split_fastas} --by-id {input.pggb_input} && '
-        "find {output.split_fastas} -name '*fa.gz' -exec readlink -f {{}} \; > {output.fastani_distance_matrix} && "
+        "find {output.split_fastas} -name '*fa.gz' -exec readlink -f {{}} \; > {params.list_of_files} && "
         'fastANI -t {threads} --fragLen 200 --ql {params.list_of_files} --rl {params.list_of_files} -o /dev/stdout  | '
         "perl -pe 's|/.*?id_||g;s|.fa.gz||g' | awk -v OFS='\\t' '{{print $1,$2,$3}}' >{output.fastani_distance_matrix}"
 # Fastani:1 ends here
@@ -134,3 +134,21 @@ rule get_distance_metrics:
     shell:
         "odgi paths -t {threads} -d -i {input.pggb_out}/*.smooth.final.og > {output.distance_tsv}"
 # odgi distance matrix:1 ends here
+
+# [[file:../../main.org::*Plot FASTANI][Plot FASTANI:1]]
+rule plot_fast_ani:
+    input:
+        fastani_distance_matrix = join_path(results_dir, 'fastani', 'fastani_distance_matrix.tsv'),
+        codes = join_path('data', 'tables', 'codes.txt'),
+        script_fix_id = join_path(snakefile_path, 'scripts', 'fix_ids.py'),
+        script_phylogeny_fastani = join_path(snakefile_path, 'scripts', 'phylogeny_fastani.R'),
+    output:
+        fastani_distance_matrixi_id_fixed = join_path(results_dir, 'fastani', 'fastani_distance_matrix.tsv'.replace('.tsv', 'ids_fixed.tsv')),
+        rectangular = join_path(results_dir, 'fastani', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
+        daylight = join_path(results_dir, 'fastani', 'ggtree.ecoli.phages.passages.daylight.pdf'),
+    conda:
+        '../envs/R_env.yaml'
+    shell:
+        'python3 {input.script_fix_id} {input.fastani_distance_matrix} {input.codes} > {output.fastani_distance_matrixi_id_fixed} && '
+        'Rscript {input.script_phylogeny_fastani} {output.fastani_distance_matrixi_id_fixed} {input.codes} {output.rectangular}'
+# Plot FASTANI:1 ends here

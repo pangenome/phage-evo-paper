@@ -41,6 +41,7 @@ rule all:
         fastani_distance_matrix = join_path(results_dir, 'fastani', 'fastani_distance_matrix.tsv'),
         pggb_out = join_path(results_dir, 'pggb', 'sample_' + str(config['sample_size']) ),
         distance_tsv = join_path(results_dir, 'pggb', 'distance_matrix.sample.' + str(config['sample_size']) + '.tsv' ),
+        rectangular = join_path(results_dir, 'fastani', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
 # MAIN RULE ALL:1 ends here
 
 # [[file:../main.org::*Include][Include:1]]
