@@ -1,21 +1,16 @@
 # [[file:../main.org::*CONFIGS][CONFIGS:1]]
-# data: 'data'
-
-# # Input
-reads: '/export/erikg/data/phage/reads'
-reads_suffix: '.merged.fastq.gz'
-
+sample_genomes: 'true'
 sample_size: 5
 
 data:
   reads: '/export/erikg/data/phage/reads'
+  reads_suffix: '.merged.fastq.gz'
   genomes:
     ecoli: 'data/genomes/bacteria/E_coli_bl21_noplasmid.fasta'
     merged: 'data/genomes/bacteria/parental_phages_and_Ecoli_bl21.fasta'
     bacteira: 'data/genomes/bacteria'
     phages: 'data/genomes/phage'
-    ecoli_and_phages: 'data/genomes/ecoli_bl21_DE_and_phages_merged.fasta'
-
+    ecoli_and_phages: 'data/genomes/ecoli_bl21_DE_and_phages_merged.fasta.gz'
 
 results:
   nanoplot:
@@ -25,14 +20,13 @@ results:
     minia: 'results/assemblies/minia'
     miniasm: 'results/assemblies/miniasm'
 
-# minia
 params:
   minia:
     kmer: 33
     abundance: 4
     min_contig_lenght: 40_000
     max_contig_lenght: 50_000
-    P1_abundance: 4
+    P1_abundance: 5
     P1_bp: 186778684
     cores: 10
   filtlong:
@@ -42,7 +36,7 @@ params:
     map_pct_id: 95
     segment_length: 500
     block_length: 1_000
-    min_match_len: 256
+    min_match_len: 47
     transclose_batch: 10_000
   seqkit:
     min: 40_000
@@ -50,6 +44,13 @@ params:
   graphaligner:
     dbtype: 'vg'
     seed_minimizer: 15
+  removing_bacteria:
+    map_pct_id: 90
+    segment_length: 1_000
+    block_length: 1_000
+    min_qcov: 1
+  fastani:
+    frag_lenght: 500
 
 # Sample genomes from assembly
 # CONFIGS:1 ends here

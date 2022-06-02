@@ -3,6 +3,7 @@ import os
 import sys
 from operator import itemgetter as itget
 import glob
+from pathlib import Path
 # IMPORTS:1 ends here
 
 # [[file:../main.org::*FILE CONFIGS][FILE CONFIGS:1]]
@@ -26,7 +27,7 @@ def get_current_HEAD_hash(default='unnamed'):
 # [[file:../main.org::*GLOBAL VARIABLES][GLOBAL VARIABLES:1]]
 snakefile_path = os.path.dirname(workflow.snakefile)
 
-SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}' + config['reads_suffix']))
+SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}' + config['data']['reads_suffix']))
 
 # results_dir = config.get('results_dir', 'results')
 results_dir = join_path('results', get_current_HEAD_hash())
@@ -35,13 +36,9 @@ results_dir = join_path('results', get_current_HEAD_hash())
 # [[file:../main.org::*MAIN RULE ALL][MAIN RULE ALL:1]]
 rule all:
     input:
-        plot_dir = expand(join_path(results_dir, 'nanoplot', '{sample}'), sample=SAMPLES),
-        putative_phage_genomes_polished = expand(join_path(results_dir, 'minia', '{sample}', '{sample}' + '.putative_phage_genomes' + '.polished' + '.prefixed' + '.fa.gz'), sample=SAMPLES),
-        pggb_input = join_path(results_dir, 'pggb', 'genomes.sample_' + str(config['sample_size']) + '_from_each_passage.fa.gz'),
-        fastani_distance_matrix = join_path(results_dir, 'fastani', 'fastani_distance_matrix.tsv'),
-        pggb_out = join_path(results_dir, 'pggb', 'sample_' + str(config['sample_size']) ),
-        distance_tsv = join_path(results_dir, 'pggb', 'distance_matrix.sample.' + str(config['sample_size']) + '.tsv' ),
-        rectangular = join_path(results_dir, 'fastani', 'ggtree.ecoli.phages.passages.rectangular.pdf'),
+        fastani_distance_matrix_id_fixed = expand(join_path(results_dir, 'fastani', '{replicate}', 'fastani_distance_matrix.sample_size_' + str(config['sample_size']) + '.ids_fixed.tsv'), replicate=('R1', 'R2')),
+        rectangular = expand(join_path(results_dir, 'fastani', '{replicate}', 'ggtree.ecoli.phages.passages.rectangular.sample_size_' + str(config['sample_size']) +  '.pdf'), replicate=('R1', 'R2')),
+        daylight = expand(join_path(results_dir, 'fastani', '{replicate}', 'ggtree.ecoli.phages.passages.daylight.sample_size_' + str(config['sample_size']) +  '.pdf'), replicate=('R1', 'R2')),
 # MAIN RULE ALL:1 ends here
 
 # [[file:../main.org::*Include][Include:1]]
