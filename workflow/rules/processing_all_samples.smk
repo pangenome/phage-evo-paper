@@ -81,9 +81,10 @@ rule filter_out_bacterial_genomes:
         '../envs/pggb_env.yaml'
     shell:
         "zcat {input.putative_phage_genomes_polished} | bgzip -@ {threads} >{output.all_genomes_merged} && "
+        "samtools faidx {output.all_genomes_merged} && "
         "samtools faidx {output.all_genomes_merged} "
-        "-r <(wfmash {input.target} {output.all_genomes_merged} -s {params.segment_length} -l {params.block_length} -p {params.map_pct_id} -t $threads | "
-        "awk -v min_qcov={params.min_qcov} '/E_coli/ {{ qcov=$11/$2; if ( !(qcov >= min_qcov) ) print $1; }}' | tee {output.ids_to_keep} ) > "
+        "-r <(wfmash {input.target} {output.all_genomes_merged} -s {params.segment_length} -l {params.block_length} -p {params.map_pct_id} -t {threads} | "
+        "awk -v min_qcov={params.min_qcov} '/E_coli/ {{ qcov=$11/$2; if ( !(qcov >= min_qcov) ) print $1; }}' | sort -u | tee {output.ids_to_keep} ) > "
         "{output.all_genomes_merged_filtered}"
 # Filter genomes:1 ends here
 
@@ -95,6 +96,7 @@ rule sample_genomes:
         codes = join_path('data', 'tables', 'codes.txt'),
     output:
         pggb_input = join_path(results_dir, 'pggb', '{replicate}', '{replicate}.merged_genomes.sample_size_' + str(config['sample_size']) + '.fa.gz'),
+        sample_ids = join_path(results_dir, 'pggb', '{replicate}', '{replicate}.ids.sample_size_' + str(config['sample_size']) + '.txt'),
     params:
         sample_size = config['sample_size'],
         log_dir = join_path(str(Path('results').parent.absolute()), 'logs'),
@@ -104,10 +106,11 @@ rule sample_genomes:
         '../envs/pggb_env.yaml'
     shell:
         'exec &> >( tee {params.log_dir}/{rule}_{wildcards.replicate}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
-        "samtools faidx {input.all_genomes_merged_filtered} -r "
-        "<( awk -F$'\\t' '/^{wildcards.replicate}/ {{print $3}}' {{input.codes}}  | "
-        'while read f; do grep -P "^${{f}}#" {input.ids_to_keep} | shuf -n {params.sample_size}; done ) | '
+        "awk -F$'\\t' '/^{wildcards.replicate}/ {{print $3}}' {input.codes}  | "
+        'while read f; do grep -P "^${{f}}#" {input.ids_to_keep} | shuf -n {params.sample_size}; done | tee {output.sample_ids} && '
+        "samtools faidx {input.all_genomes_merged_filtered} -r {output.sample_ids} | "
         'bgzip -@ {threads} > {output.pggb_input} '
+        
 # Sample genomes:1 ends here
 
 # [[file:../../main.org::*Fastani][Fastani:1]]
@@ -143,10 +146,12 @@ rule plot_fast_ani:
     output:
         fastani_distance_matrix_id_fixed = join_path(results_dir, 'fastani', '{replicate}', 'fastani_distance_matrix.sample_size_' + str(config['sample_size']) + '.ids_fixed.tsv'),
         rectangular = join_path(results_dir, 'fastani', '{replicate}', 'ggtree.ecoli.phages.passages.rectangular.sample_size_' + str(config['sample_size']) +  '.pdf'),
-        daylight = join_path(results_dir, 'fastani', '{replicate}', 'ggtree.ecoli.phages.passages.daylight.sample_size_' + str(config['sample_size']) +  '.pdf'),
+#        daylight = join_path(results_dir, 'fastani', '{replicate}', 'ggtree.ecoli.phages.passages.daylight.sample_size_' + str(config['sample_size']) +  '.pdf'),
+    params:
+        title = "Run_{}.sample_size_{}.K{}.A{}_bp_relative.min40K.max50.GA_polished".format('{replicate}', config['sample_size'], config['params']['minia']['kmer'], config['params']['minia']['abundance'])
     conda:
         '../envs/R_env.yaml'
     shell:
         'python3 {input.script_fix_id} {input.fastani_distance_matrix} {input.codes} > {output.fastani_distance_matrix_id_fixed} && '
-        'Rscript {input.script_phylogeny_fastani} {output.fastani_distance_matrix_id_fixed} {input.codes} {output.rectangular}'
+        'Rscript {input.script_phylogeny_fastani} {output.fastani_distance_matrix_id_fixed} {input.codes} {output.rectangular} {params.title}'
 # Plot FASTANI:1 ends here

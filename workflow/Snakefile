@@ -38,7 +38,7 @@ rule all:
     input:
         fastani_distance_matrix_id_fixed = expand(join_path(results_dir, 'fastani', '{replicate}', 'fastani_distance_matrix.sample_size_' + str(config['sample_size']) + '.ids_fixed.tsv'), replicate=('R1', 'R2')),
         rectangular = expand(join_path(results_dir, 'fastani', '{replicate}', 'ggtree.ecoli.phages.passages.rectangular.sample_size_' + str(config['sample_size']) +  '.pdf'), replicate=('R1', 'R2')),
-        daylight = expand(join_path(results_dir, 'fastani', '{replicate}', 'ggtree.ecoli.phages.passages.daylight.sample_size_' + str(config['sample_size']) +  '.pdf'), replicate=('R1', 'R2')),
+#        daylight = expand(join_path(results_dir, 'fastani', '{replicate}', 'ggtree.ecoli.phages.passages.daylight.sample_size_' + str(config['sample_size']) +  '.pdf'), replicate=('R1', 'R2')),
 # MAIN RULE ALL:1 ends here
 
 # [[file:../main.org::*Include][Include:1]]

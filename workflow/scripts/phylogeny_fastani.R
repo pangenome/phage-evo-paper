@@ -15,6 +15,7 @@ args <- commandArgs(trailingOnly = TRUE)
 fastani_out=args[1]
 codes_txt=args[2]
 output=args[3]
+title=args[4]
 
 pdf(file=paste(dirname(output), 'Rplots.pdf', sep = '/'))
 
@@ -40,13 +41,13 @@ y.tree <- nj(as.dist(y.dist[, !names(y.dist) %in% c("seq.A")]))
 group.info <- split(y.tree$tip.label, gsub("#.+", "", y.tree$tip.label))
 y.tree <- groupOTU(y.tree, group.info)
 
-ggtree(y.tree, branch.length = 'none', layout = 'rectangular') + geom_tippoint(aes(color=group), size=1) + scale_color_manual('Passages' , values=col_pallet)
+ggtree(y.tree, branch.length = 'none', layout = 'rectangular') + geom_tippoint(aes(color=group), size=1) + scale_color_manual('Passages' , values=col_pallet) +  ggtitle(title)
 
-ggsave(output, height=40, width=9)
+ggsave(output, height=60, width=10, limitsize = FALSE)
 
-ggtree(y.tree, branch.length = 'none', layout = 'daylight') + geom_tippoint(aes(color=group), size=1) + scale_color_manual('Passages' , values=col_pallet)
+# ggtree(y.tree, branch.length = 'none', layout = 'daylight') + geom_tippoint(aes(color=group), size=1) + scale_color_manual('Passages' , values=col_pallet) + ggtitle(title)
 
-ggsave(gsub('rectangular', 'daylight', output), height=10, width=20)
+# ggsave(gsub('rectangular', 'daylight', output), height=10, width=20)
 
 
 

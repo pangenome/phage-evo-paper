@@ -1,6 +1,6 @@
 # [[file:../main.org::*CONFIGS][CONFIGS:1]]
 sample_genomes: 'true'
-sample_size: 5
+sample_size: 100
 
 data:
   reads: '/export/erikg/data/phage/reads'
