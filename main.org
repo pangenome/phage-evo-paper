@@ -954,6 +954,7 @@ rule sample_genomes:
         codes = join_path('data', 'tables', 'codes.tsv'),
     output:
         pggb_input = join_path(results_dir, 'pggb', '{experiment}', '{experiment}.merged_genomes.sample_size_' + str(config['sample_size']) + '.fa.gz'),
+        sample_ids = join_path(results_dir, 'pggb', '{experiment}', '{experiment}.ids.sample_size_' + str(config['sample_size']) + '.txt'),
     params:
         sample_size = config['sample_size'],
         log_dir = join_path(str(Path('results').parent.absolute()), 'logs'),
@@ -963,9 +964,9 @@ rule sample_genomes:
         '../envs/pggb_env.yaml'
     shell:
         'exec &> >( tee {params.log_dir}/{rule}_{wildcards.experiment}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
-        "samtools faidx {input.all_genomes_merged_filtered} -r "
-        "<( awk -F$'\\t' '/^{wildcards.experiment}/ {{print $3}}' {{input.codes}}  | "
-        'while read f; do grep -P "^${{f}}#" {input.ids_to_keep} | shuf -n {params.sample_size}; done ) | '
+        "awk -F$'\\t' '/^{wildcards.experiment}/ {{print $3}}' {input.codes}  | "
+        'while read f; do grep -P "^${{f}}#" {input.ids_to_keep} | shuf -n {params.sample_size}; done | tee {output.sample_ids} && '
+        "samtools faidx {input.all_genomes_merged_filtered} -r {output.sample_ids} | "
         'bgzip -@ {threads} > {output.pggb_input} '
 
 #+END_SRC
