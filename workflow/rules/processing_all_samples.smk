@@ -93,10 +93,9 @@ rule sample_genomes:
     input:
         all_genomes_merged_filtered = join_path(results_dir, 'pggb', 'all_genomes_merged.filter_out_bacteria.fa.gz'),
         ids_to_keep = join_path(results_dir, 'pggb', 'ids_to_keep.txt'),
-        codes = join_path('data', 'tables', 'codes.txt'),
+        codes = join_path('data', 'tables', 'codes.tsv'),
     output:
-        pggb_input = join_path(results_dir, 'pggb', '{replicate}', '{replicate}.merged_genomes.sample_size_' + str(config['sample_size']) + '.fa.gz'),
-        sample_ids = join_path(results_dir, 'pggb', '{replicate}', '{replicate}.ids.sample_size_' + str(config['sample_size']) + '.txt'),
+        pggb_input = join_path(results_dir, 'pggb', '{experiment}', '{experiment}.merged_genomes.sample_size_' + str(config['sample_size']) + '.fa.gz'),
     params:
         sample_size = config['sample_size'],
         log_dir = join_path(str(Path('results').parent.absolute()), 'logs'),
@@ -105,22 +104,21 @@ rule sample_genomes:
     conda:
         '../envs/pggb_env.yaml'
     shell:
-        'exec &> >( tee {params.log_dir}/{rule}_{wildcards.replicate}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
-        "awk -F$'\\t' '/^{wildcards.replicate}/ {{print $3}}' {input.codes}  | "
-        'while read f; do grep -P "^${{f}}#" {input.ids_to_keep} | shuf -n {params.sample_size}; done | tee {output.sample_ids} && '
-        "samtools faidx {input.all_genomes_merged_filtered} -r {output.sample_ids} | "
+        'exec &> >( tee {params.log_dir}/{rule}_{wildcards.experiment}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
+        "samtools faidx {input.all_genomes_merged_filtered} -r "
+        "<( awk -F$'\\t' '/^{wildcards.experiment}/ {{print $3}}' {{input.codes}}  | "
+        'while read f; do grep -P "^${{f}}#" {input.ids_to_keep} | shuf -n {params.sample_size}; done ) | '
         'bgzip -@ {threads} > {output.pggb_input} '
-        
 # Sample genomes:1 ends here
 
 # [[file:../../main.org::*Fastani][Fastani:1]]
 rule fastaANI_distance_matrix:
     input:
-        pggb_input = join_path(results_dir, 'pggb', '{replicate}', '{replicate}.merged_genomes.sample_size_' + str(config['sample_size']) + '.fa.gz'),
+        pggb_input = join_path(results_dir, 'pggb', '{experiment}', '{experiment}.merged_genomes.sample_size_' + str(config['sample_size']) + '.fa.gz'),
     output:
-        split_fastas = directory(join_path(results_dir, 'fastani',  '{replicate}', 'split_fasta_' + str(config['sample_size']) )),
-        fastani_distance_matrix = join_path(results_dir, 'fastani', '{replicate}', 'fastani_distance_matrix.sample_size_' + str(config['sample_size']) + '.tsv'),
-        list_of_files = join_path(results_dir, 'fastani', '{replicate}', 'list_of_splited_fastas_pahts.sample_size_' + str(config['sample_size']) + '.txt'),
+        split_fastas = directory(join_path(results_dir, 'fastani',  '{experiment}', '{experiment}.split_fasta_' + str(config['sample_size']) )),
+        fastani_distance_matrix = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.fastani_distance_matrix.sample_size_' + str(config['sample_size']) + '.tsv'),
+        list_of_files = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.list_of_splited_fastas_pahts.sample_size_' + str(config['sample_size']) + '.txt'),
     params:
         **config['params']['fastani'],
         log_dir = join_path(str(Path('results').parent.absolute()), 'logs')
@@ -129,7 +127,7 @@ rule fastaANI_distance_matrix:
     threads:
         get_cores_perc(1)
     shell:
-        'exec &> >( tee {params.log_dir}/{rule}_{wildcards.replicate}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
+        'exec &> >( tee {params.log_dir}/{rule}_{wildcards.experiment}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
         'seqkit split -O {output.split_fastas} --by-id {input.pggb_input} && '
         "find {output.split_fastas} -name '*fa.gz' -exec readlink -f {{}} \; > {output.list_of_files} && "
         'fastANI -t {threads} --fragLen {params.frag_lenght} --ql {output.list_of_files} --rl {output.list_of_files} -o /dev/stdout  | '
@@ -139,16 +137,15 @@ rule fastaANI_distance_matrix:
 # [[file:../../main.org::*Plot FASTANI][Plot FASTANI:1]]
 rule plot_fast_ani:
     input:
-        fastani_distance_matrix = join_path(results_dir, 'fastani', '{replicate}', 'fastani_distance_matrix.sample_size_' + str(config['sample_size']) + '.tsv'),
-        codes = join_path('data', 'tables', 'codes.txt'),
+        fastani_distance_matrix = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.fastani_distance_matrix.sample_size_' + str(config['sample_size']) + '.tsv'),
+        codes = join_path('data', 'tables', 'codes.tsv'),
         script_fix_id = join_path(snakefile_path, 'scripts', 'fix_ids.py'),
         script_phylogeny_fastani = join_path(snakefile_path, 'scripts', 'phylogeny_fastani.R'),
     output:
-        fastani_distance_matrix_id_fixed = join_path(results_dir, 'fastani', '{replicate}', 'fastani_distance_matrix.sample_size_' + str(config['sample_size']) + '.ids_fixed.tsv'),
-        rectangular = join_path(results_dir, 'fastani', '{replicate}', 'ggtree.ecoli.phages.passages.rectangular.sample_size_' + str(config['sample_size']) +  '.pdf'),
-#        daylight = join_path(results_dir, 'fastani', '{replicate}', 'ggtree.ecoli.phages.passages.daylight.sample_size_' + str(config['sample_size']) +  '.pdf'),
+        fastani_distance_matrix_id_fixed = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.fastani_distance_matrix.sample_size_' + str(config['sample_size']) + '.ids_fixed.tsv'),
+        rectangular = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.ggtree.ecoli.phages.passages.rectangular.sample_size_' + str(config['sample_size']) +  '.pdf'),
     params:
-        title = "Run_{}.sample_size_{}.K{}.A{}_bp_relative.min40K.max50.GA_polished".format('{replicate}', config['sample_size'], config['params']['minia']['kmer'], config['params']['minia']['abundance'])
+        title = "{}.sample_size_{}.K{}.A{}_bp_relative.min40K.max50.GA_polished".format('{experiment}', config['sample_size'], config['params']['minia']['kmer'], config['params']['minia']['P1_abundance'])
     conda:
         '../envs/R_env.yaml'
     shell:

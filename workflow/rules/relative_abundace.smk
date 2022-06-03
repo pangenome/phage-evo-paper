@@ -97,16 +97,25 @@ rule polishing_graphaligner_minia:
 # [[file:../../main.org::*Sample genomes][Sample genomes:1]]
 rule sample_genomes:
     input:
-        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.fa.gz'),
+        all_genomes_merged_filtered = join_path(results_dir, 'pggb', 'all_genomes_merged.filter_out_bacteria.fa.gz'),
+        ids_to_keep = join_path(results_dir, 'pggb', 'ids_to_keep.txt'),
+        codes = join_path('data', 'tables', 'codes.tsv'),
     output:
-        polished_reads = join_path('results', results_dir, 'minia', '{sample}', '{sample}.reads.polished.sample.' + str(config['sample_size']) + '.fa.gz' ),
+        pggb_input = join_path(results_dir, 'pggb', '{experiment}', '{experiment}.merged_genomes.sample_size_' + str(config['sample_size']) + '.fa.gz'),
+        sample_ids = join_path(results_dir, 'pggb', '{experiment}', '{experiment}.ids.sample_size_' + str(config['sample_size']) + '.txt'),
     params:
-        sample_size = config['sample_size']
+        sample_size = config['sample_size'],
+        log_dir = join_path(str(Path('results').parent.absolute()), 'logs'),
     threads:
-        4
+        get_cores_perc(1)
+    conda:
+        '../envs/pggb_env.yaml'
     shell:
-        "samtools faidx {input.polished_reads} $(zgrep '>' {input.polished_reads} | sed 's/>//' | cut -d ' ' -f1 | shuf -n {params.sample_size}) | "
-        "bgzip > {output.polished_reads}"
+        'exec &> >( tee {params.log_dir}/{rule}_{wildcards.experiment}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
+        "awk -F$'\\t' '/^{wildcards.experiment}/ {{print $3}}' {input.codes}  | "
+        'while read f; do grep -P "^${{f}}#" {input.ids_to_keep} | shuf -n {params.sample_size}; done | tee {output.sample_ids} && '
+        "samtools faidx {input.all_genomes_merged_filtered} -r {output.sample_ids} | "
+        'bgzip -@ {threads} > {output.pggb_input} '
 # Sample genomes:1 ends here
 
 # [[file:../../main.org::*Merge samples][Merge samples:1]]

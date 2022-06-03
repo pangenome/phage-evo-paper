@@ -1,6 +1,16 @@
 # [[file:../main.org::*CONFIGS][CONFIGS:1]]
+experiments:
+  - 'TREE_1'
+  - 'TREE_2'
+  - 'TREE_3'
+  - 'TREE_4'
+  - 'TREE_5'
+  - 'TREE_6'
+
 sample_genomes: 'true'
 sample_size: 100
+tree_title: ''
+
 
 data:
   reads: '/export/erikg/data/phage/reads'
@@ -23,7 +33,7 @@ results:
 params:
   minia:
     kmer: 33
-    abundance: 4
+    # abundance: 4
     min_contig_lenght: 40_000
     max_contig_lenght: 50_000
     P1_abundance: 5
