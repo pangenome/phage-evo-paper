@@ -8,7 +8,7 @@ experiments:
   - 'TREE_6'
 
 sample_genomes: 'true'
-sample_size: 100
+sample_size: 10
 tree_title: ''
 
 
