@@ -167,12 +167,12 @@ rule annotation:
         **config['params']['phanotate'],
         log_dir = join_path(snakefile_path, '..', 'logs'),
     conda:
-        '../phanotate_env.yaml'
+        '../envs/phanotate_env.yaml'
     threads:
         get_cores_perc(1)
     shell:
         'exec &> >( tee {params.log_dir}/{rule}_{wildcards.experiment}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
         'python3 {input.phanotate_runner} --input_file_list {input.list_of_files} '
         ' --threads {threads} --out_format {params.out_format} --output_dir {output.phanotate_dir} && '
-        '[[ $(wc -l {input.list_of_files}) == $( ls {output.phanotate_dir} | wc -l ) ]] && >{output.finished} '
+        '>{output.finished} '
 # Anotation:1 ends here

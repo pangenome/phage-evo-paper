@@ -38,7 +38,7 @@ scripts_dir = join_path(snakefile_path, 'scripts')
 rule all:
     input:
         rectangular = expand(join_path(results_dir, 'fastani', '{experiment}', '{experiment}.ggtree.ecoli.phages.passages.rectangular.sample_size_' + str(config['sample_size']) +  '.pdf'), experiment=EXPERIMENTS),
-        phanotate_dir = expand(join_path(results_dir, 'phanotate', '{experiment}', 'finished'), experiment=EXPERIMENTS),
+        finished = expand(join_path(results_dir, 'phanotate', '{experiment}', 'finished_phanotate'), experiment=EXPERIMENTS),
 # MAIN RULE ALL:1 ends here
 
 # [[file:../main.org::*Include][Include:1]]
