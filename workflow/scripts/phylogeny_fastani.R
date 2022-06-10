@@ -48,3 +48,9 @@ ggsave(output, height=60, width=10, limitsize = FALSE)
 ggtree(y.tree, branch.length = 'none', layout = 'circular') + geom_tippoint(aes(color=group), size=1) + scale_color_manual('Passages' , values=col_pallet) + ggtitle(title)
 
 ggsave(gsub('rectangular', 'circular', output), height=15, width=15)
+
+ggtree(y.tree, layout = 'slanted') + geom_tippoint(aes(color=group), size=1) + scale_color_manual('Passages' , values=col_pallet) + ggtitle(title)
+ggsave(gsub('rectangular', 'slanted', output), height=15, width=15)
+
+ggtree(y.tree, layout = 'equal_angle') + geom_tippoint(aes(color=group), size=1) + scale_color_manual('Passages' , values=col_pallet) + ggtitle(title)
+ggsave(gsub('rectangular', 'equal_angle', output), height=20, width=20)
