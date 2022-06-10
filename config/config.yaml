@@ -11,6 +11,8 @@ sample_genomes: 'true'
 sample_size: 3
 tree_title: ''
 
+mmseqs_phrogs_url:
+  'https://phrogs.lmge.uca.fr/downloads_from_website/phrogs_mmseqs_db.tar.gz'
 
 data:
   reads: '/export/erikg/data/phage/reads'

@@ -155,14 +155,14 @@ rule plot_fast_ani:
         'Rscript {input.script_phylogeny_fastani} {output.fastani_distance_matrix_id_fixed} {input.codes} {output.rectangular} {params.title}'
 # Plot FASTANI:1 ends here
 
-# [[file:../../main.org::*Anotation][Anotation:1]]
-rule annotation:
+# [[file:../../main.org::*ORF prediction][ORF prediction:1]]
+rule orf_prediction_phanotate:
     input:
         list_of_files = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.list_of_splited_fastas_pahts.sample_size_' + str(config['sample_size']) + '.txt'),
         phanotate_runner = join_path(scripts_dir, 'phanotate_runner.py'),
     output:
-        phanotate_dir = directory(join_path(results_dir, 'phanotate', '{experiment}')),
-        finished = join_path(results_dir, 'phanotate', '{experiment}', 'finished_phanotate'),
+        phanotate_dir = directory(join_path(results_dir, 'annotations', 'phanotate', '{experiment}')),
+        finished = join_path(results_dir, 'annotations', 'phanotate', '{experiment}', 'finished_phanotate'),
     params:
         **config['params']['phanotate'],
         log_dir = join_path(snakefile_path, '..', 'logs'),
@@ -175,4 +175,47 @@ rule annotation:
         'python3 {input.phanotate_runner} --input_file_list {input.list_of_files} '
         ' --threads {threads} --out_format {params.out_format} --output_dir {output.phanotate_dir} && '
         '>{output.finished} '
-# Anotation:1 ends here
+# ORF prediction:1 ends here
+
+# [[file:../../main.org::*Get multi PHROGS][Get multi PHROGS:1]]
+rule annotation_homology_search_phrogs:
+    input:
+        phanotate_dir = join_path(results_dir, 'annotations', 'phanotate', '{experiment}'),
+        mmseqs_phrogs_db = join_path('data', 'phrogs_mmseqs_db', 'phrogs_profile_db'),
+    output:
+        fna = join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.phanotate.ORFs.fna'),
+        fna_db = join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.phanotate.ORFs.db'),
+        fna_db_clu = join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.phanotate.ORFs.clusterized.db'),
+        fna_db_rep = join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.phanotate.ORFs.rep.db'),
+        compare_db = join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.phanotate.ORFs.compare.db'),
+        tsv = join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.phanotate.ORFs.tsv'),
+    params:
+        tmp = join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.tmp'),
+    threads:
+        get_cores_perc(1)
+    conda:
+        '../envs/homology_search.yaml'
+    shell:
+        'find {input.phanotate_dir} -name "*.fasta" | xargs cat > {output.fna} && '
+        'mmseqs createdb {output.fna} {output.fna_db} && '
+        'mmseqs cluster {output.fna_db} {output.fna_db_clu} {params.tmp} --threads {threads} && '
+        'mmseqs createsubdb {output.fna_db_clu} {output.fna_db} {output.fna_db_rep} {params.tmp} && '
+        'mmseqs search {input.mmseqs_phrogs_db} {output.fna_db_rep} {output.compare_db} {params.tmp} -s 7 --threads {threads} && '
+        'mmseqs createtsv {input.mmseqs_phrogs_db} {output.compare_db} {output.tsv} --threads {threads} '
+# Get multi PHROGS:1 ends here
+
+# [[file:../../main.org::*Download PHROGS database][Download PHROGS database:1]]
+rule download_phrogs_database:
+    input:
+        mmseqs_phrogs_url = config['mmseqs_phrogs_url'],
+    output:
+        mmseqs_phrogs_db = join_path('data', 'phrogs_mmseqs_db', 'phrogs_profile_db')
+    params:
+        log_dir = join_path(snakefile_path, '..', 'logs'),
+    threads:
+        1
+    shell:
+        'exec &> >( tee {params.log_dir}/{rule}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
+        'wget -O "{output.mmseqs_phrogs_db}.tar.gz" {input.mmseqs_phrogs_url} && '
+        'tar -vxf "{output.mmseqs_phrogs_db}.tar.gz" -C "$(dirname {output.mmseqs_phrogs_db} )" '
+# Download PHROGS database:1 ends here
