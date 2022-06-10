@@ -91,7 +91,6 @@ def get_current_HEAD_hash(default='unnamed'):
 
 ** GLOBAL VARIABLES
 #+BEGIN_SRC snakemake
-
 SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}' + config['data']['reads_suffix']))
 EXPERIMENTS = config['experiments']
 
@@ -982,7 +981,7 @@ rule fastaANI_distance_matrix:
         fastani_distance_matrix = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.fastani_distance_matrix.sample_size_' + str(config['sample_size']) + '.tsv'),
         list_of_files = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.list_of_splited_fastas_pahts.sample_size_' + str(config['sample_size']) + '.txt'),
     params:
-        ,**config['params']['fastani'],
+        **config['params']['fastani'],
         log_dir = join_path(str(Path('results').parent.absolute()), 'logs')
     conda:
         '../envs/fastani_env.yaml'
@@ -1025,17 +1024,17 @@ rule orf_prediction_phanotate:
         phanotate_dir = directory(join_path(results_dir, 'annotations', 'phanotate', '{experiment}')),
         finished = join_path(results_dir, 'annotations', 'phanotate', '{experiment}', 'finished_phanotate'),
     params:
-        ,**config['params']['phanotate'],
+        **config['params']['phanotate'],
         log_dir = join_path(snakefile_path, '..', 'logs'),
     conda:
-        '../phanotate_env.yaml'
+        '../envs/phanotate_env.yaml'
     threads:
         get_cores_perc(1)
     shell:
         'exec &> >( tee {params.log_dir}/{rule}_{wildcards.experiment}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
         'python3 {input.phanotate_runner} --input_file_list {input.list_of_files} '
         ' --threads {threads} --out_format {params.out_format} --output_dir {output.phanotate_dir} && '
-        '[[ $(wc -l {input.list_of_files}) == $( ls {output.phanotate_dir} | wc -l ) ]] && >{output.finished} '
+        '>{output.finished} '
 #+END_SRC
 *** Get multi PHROGS
 #+BEGIN_SRC snakemake
@@ -1080,7 +1079,6 @@ rule download_phrogs_database:
         'wget -O "{output.mmseqs_phrogs_db}.tar.gz" {input.mmseqs_phrogs_url} && '
         'tar -vxf "{output.mmseqs_phrogs_db}.tar.gz" -C "$(dirname {output.mmseqs_phrogs_db} )" '
 #+END_SRC
-
 
 ** PGGB
 *** PGGB
