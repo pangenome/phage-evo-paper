@@ -8,7 +8,7 @@ experiments:
   - 'TREE_6'
 
 sample_genomes: 'true'
-sample_size: 10
+sample_size: 100
 tree_title: ''
 
 
@@ -61,6 +61,8 @@ params:
     min_qcov: 1
   fastani:
     frag_lenght: 500
+  phanotate:
+    out_format: 'fasta'
 
 # Sample genomes from assembly
 # CONFIGS:1 ends here

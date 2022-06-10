@@ -91,19 +91,21 @@ def get_current_HEAD_hash(default='unnamed'):
 
 ** GLOBAL VARIABLES
 #+BEGIN_SRC snakemake
-snakefile_path = os.path.dirname(workflow.snakefile)
 
 SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}' + config['data']['reads_suffix']))
 EXPERIMENTS = config['experiments']
 
-# results_dir = config.get('results_dir', 'results')
-results_dir = join_path('results', get_current_HEAD_hash())
+snakefile_path = os.path.dirname(workflow.snakefile)
+# results_dir = join_path('results', get_current_HEAD_hash())
+results_dir = join_path('results', 'with_erro_corr')
+scripts_dir = join_path(snakefile_path, 'scripts')
 #+END_SRC
 ** MAIN RULE ALL
 #+BEGIN_SRC snakemake
 rule all:
     input:
-        rectangular = expand(join_path(results_dir, 'fastani', '{experiment}', '{experiment}.ggtree.ecoli.phages.passages.rectangular.sample_size_' + str(config['sample_size']) +  '.pdf'), experiment=EXPERIMENTS)
+        rectangular = expand(join_path(results_dir, 'fastani', '{experiment}', '{experiment}.ggtree.ecoli.phages.passages.rectangular.sample_size_' + str(config['sample_size']) +  '.pdf'), experiment=EXPERIMENTS),
+        phanotate_dir = expand(join_path(results_dir, 'phanotate', '{experiment}', 'finished'), experiment=EXPERIMENTS),
 #+END_SRC
 
 ** Include
@@ -849,7 +851,7 @@ rule annotation:
 
 #+END_SRC
 
-** Processing two replicates
+** Processing all experiments
 :PROPERTIES:
 :COOKIE_DATA: todo recursive
 :header-args: :tangle workflow/rules/processing_all_samples.smk :mkdirp yes :exports none :eval never-export :comments link
@@ -980,7 +982,7 @@ rule fastaANI_distance_matrix:
         fastani_distance_matrix = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.fastani_distance_matrix.sample_size_' + str(config['sample_size']) + '.tsv'),
         list_of_files = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.list_of_splited_fastas_pahts.sample_size_' + str(config['sample_size']) + '.txt'),
     params:
-        **config['params']['fastani'],
+        ,**config['params']['fastani'],
         log_dir = join_path(str(Path('results').parent.absolute()), 'logs')
     conda:
         '../envs/fastani_env.yaml'
@@ -989,9 +991,10 @@ rule fastaANI_distance_matrix:
     shell:
         'exec &> >( tee {params.log_dir}/{rule}_{wildcards.experiment}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
         'seqkit split -O {output.split_fastas} --by-id {input.pggb_input} && '
-        "find {output.split_fastas} -name '*fa.gz' -exec readlink -f {{}} \; > {output.list_of_files} && "
+        'gunzip {output.split_fastas}/*.fa.gz && '
+        "find {output.split_fastas} -name '*.fa' -exec readlink -f {{}} \; > {output.list_of_files} && "
         'fastANI -t {threads} --fragLen {params.frag_lenght} --ql {output.list_of_files} --rl {output.list_of_files} -o /dev/stdout  | '
-        "perl -pe 's|/.*?id_||g;s|.fa.gz||g' | awk -v OFS='\\t' '{{print $1,$2,$3}}' >{output.fastani_distance_matrix}"
+        "perl -pe 's|/.*?id_||g;s|.fa||g' | awk -v OFS='\\t' '{{print $1,$2,$3}}' >{output.fastani_distance_matrix}"
 #+END_SRC
 *** Plot FASTANI
 #+BEGIN_SRC snakemake
@@ -1012,6 +1015,29 @@ rule plot_fast_ani:
         'python3 {input.script_fix_id} {input.fastani_distance_matrix} {input.codes} > {output.fastani_distance_matrix_id_fixed} && '
         'Rscript {input.script_phylogeny_fastani} {output.fastani_distance_matrix_id_fixed} {input.codes} {output.rectangular} {params.title}'
 #+END_SRC
+*** Anotation
+#+BEGIN_SRC snakemake
+rule annotation:
+    input:
+        list_of_files = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.list_of_splited_fastas_pahts.sample_size_' + str(config['sample_size']) + '.txt'),
+        phanotate_runner = join_path(scripts_dir, 'phanotate_runner.py'),
+    output:
+        phanotate_dir = directory(join_path(results_dir, 'phanotate', '{experiment}')),
+        finished = join_path(results_dir, 'phanotate', '{experiment}', 'finished_phanotate'),
+    params:
+        ,**config['params']['phanotate'],
+        log_dir = join_path(snakefile_path, '..', 'logs'),
+    conda:
+        '../phanotate_env.yaml'
+    threads:
+        get_cores_perc(1)
+    shell:
+        'exec &> >( tee {params.log_dir}/{rule}_{wildcards.experiment}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
+        'python3 {input.phanotate_runner} --input_file_list {input.list_of_files} '
+        ' --threads {threads} --out_format {params.out_format} --output_dir {output.phanotate_dir} && '
+        '[[ $(wc -l {input.list_of_files}) == $( ls {output.phanotate_dir} | wc -l ) ]] && >{output.finished} '
+#+END_SRC
+
 ** PGGB
 *** PGGB
 #+BEGIN_SRC snakemake
@@ -1115,6 +1141,8 @@ params:
     min_qcov: 1
   fastani:
     frag_lenght: 500
+  phanotate:
+    out_format: 'fasta'
 
 # Sample genomes from assembly
 #+END_SRC

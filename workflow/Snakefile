@@ -25,19 +25,20 @@ def get_current_HEAD_hash(default='unnamed'):
 # FUNCTIONS:1 ends here
 
 # [[file:../main.org::*GLOBAL VARIABLES][GLOBAL VARIABLES:1]]
-snakefile_path = os.path.dirname(workflow.snakefile)
-
 SAMPLES, = glob_wildcards(join_path(config['data']['reads'], '{sample}' + config['data']['reads_suffix']))
 EXPERIMENTS = config['experiments']
 
-# results_dir = config.get('results_dir', 'results')
-results_dir = join_path('results', get_current_HEAD_hash())
+snakefile_path = os.path.dirname(workflow.snakefile)
+# results_dir = join_path('results', get_current_HEAD_hash())
+results_dir = join_path('results', 'with_erro_corr')
+scripts_dir = join_path(snakefile_path, 'scripts')
 # GLOBAL VARIABLES:1 ends here
 
 # [[file:../main.org::*MAIN RULE ALL][MAIN RULE ALL:1]]
 rule all:
     input:
-        rectangular = expand(join_path(results_dir, 'fastani', '{experiment}', '{experiment}.ggtree.ecoli.phages.passages.rectangular.sample_size_' + str(config['sample_size']) +  '.pdf'), experiment=EXPERIMENTS)
+        rectangular = expand(join_path(results_dir, 'fastani', '{experiment}', '{experiment}.ggtree.ecoli.phages.passages.rectangular.sample_size_' + str(config['sample_size']) +  '.pdf'), experiment=EXPERIMENTS),
+        phanotate_dir = expand(join_path(results_dir, 'phanotate', '{experiment}', 'finished'), experiment=EXPERIMENTS),
 # MAIN RULE ALL:1 ends here
 
 # [[file:../main.org::*Include][Include:1]]

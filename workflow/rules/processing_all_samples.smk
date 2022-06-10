@@ -110,9 +110,6 @@ rule sample_genomes:
         'while read f; do grep -P "^${{f}}#" {input.ids_to_keep} | shuf -n {params.sample_size}; done | tee {output.sample_ids} && '
         "samtools faidx {input.all_genomes_merged_filtered} -r {output.sample_ids} | "
         'bgzip -@ {threads} > {output.pggb_input} '
-
-
-
 # Sample genomes:1 ends here
 
 # [[file:../../main.org::*Fastani][Fastani:1]]
@@ -133,9 +130,10 @@ rule fastaANI_distance_matrix:
     shell:
         'exec &> >( tee {params.log_dir}/{rule}_{wildcards.experiment}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
         'seqkit split -O {output.split_fastas} --by-id {input.pggb_input} && '
-        "find {output.split_fastas} -name '*fa.gz' -exec readlink -f {{}} \; > {output.list_of_files} && "
+        'gunzip {output.split_fastas}/*.fa.gz && '
+        "find {output.split_fastas} -name '*.fa' -exec readlink -f {{}} \; > {output.list_of_files} && "
         'fastANI -t {threads} --fragLen {params.frag_lenght} --ql {output.list_of_files} --rl {output.list_of_files} -o /dev/stdout  | '
-        "perl -pe 's|/.*?id_||g;s|.fa.gz||g' | awk -v OFS='\\t' '{{print $1,$2,$3}}' >{output.fastani_distance_matrix}"
+        "perl -pe 's|/.*?id_||g;s|.fa||g' | awk -v OFS='\\t' '{{print $1,$2,$3}}' >{output.fastani_distance_matrix}"
 # Fastani:1 ends here
 
 # [[file:../../main.org::*Plot FASTANI][Plot FASTANI:1]]
@@ -156,3 +154,25 @@ rule plot_fast_ani:
         'python3 {input.script_fix_id} {input.fastani_distance_matrix} {input.codes} > {output.fastani_distance_matrix_id_fixed} && '
         'Rscript {input.script_phylogeny_fastani} {output.fastani_distance_matrix_id_fixed} {input.codes} {output.rectangular} {params.title}'
 # Plot FASTANI:1 ends here
+
+# [[file:../../main.org::*Anotation][Anotation:1]]
+rule annotation:
+    input:
+        list_of_files = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.list_of_splited_fastas_pahts.sample_size_' + str(config['sample_size']) + '.txt'),
+        phanotate_runner = join_path(scripts_dir, 'phanotate_runner.py'),
+    output:
+        phanotate_dir = directory(join_path(results_dir, 'phanotate', '{experiment}')),
+        finished = join_path(results_dir, 'phanotate', '{experiment}', 'finished_phanotate'),
+    params:
+        **config['params']['phanotate'],
+        log_dir = join_path(snakefile_path, '..', 'logs'),
+    conda:
+        '../phanotate_env.yaml'
+    threads:
+        get_cores_perc(1)
+    shell:
+        'exec &> >( tee {params.log_dir}/{rule}_{wildcards.experiment}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
+        'python3 {input.phanotate_runner} --input_file_list {input.list_of_files} '
+        ' --threads {threads} --out_format {params.out_format} --output_dir {output.phanotate_dir} && '
+        '[[ $(wc -l {input.list_of_files}) == $( ls {output.phanotate_dir} | wc -l ) ]] && >{output.finished} '
+# Anotation:1 ends here

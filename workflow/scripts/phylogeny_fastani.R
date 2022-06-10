@@ -45,9 +45,6 @@ ggtree(y.tree, branch.length = 'none', layout = 'rectangular') + geom_tippoint(a
 
 ggsave(output, height=60, width=10, limitsize = FALSE)
 
-# ggtree(y.tree, branch.length = 'none', layout = 'daylight') + geom_tippoint(aes(color=group), size=1) + scale_color_manual('Passages' , values=col_pallet) + ggtitle(title)
+ggtree(y.tree, branch.length = 'none', layout = 'circular') + geom_tippoint(aes(color=group), size=1) + scale_color_manual('Passages' , values=col_pallet) + ggtitle(title)
 
-# ggsave(gsub('rectangular', 'daylight', output), height=10, width=20)
-
-
-
+ggsave(gsub('rectangular', 'circular', output), height=15, width=15)
