@@ -41,6 +41,14 @@ y.tree <- nj(as.dist(y.dist[, !names(y.dist) %in% c("seq.A")]))
 group.info <- split(y.tree$tip.label, gsub("#.+", "", y.tree$tip.label))
 y.tree <- groupOTU(y.tree, group.info)
 
+# remove names from col_pallet that are not in y.tree
+# get y.tree unique names prefixes
+y.tree.names <- unique(gsub("#.+", "", y.tree$tip.label))
+
+# for col_pallet name check if it is in y.tree.names
+col_pallet <- col_pallet[names(col_pallet) %in% y.tree.names ]
+
+
 ggtree(y.tree, branch.length = 'none', layout = 'rectangular') + geom_tippoint(aes(color=group), size=1) + scale_color_manual('Passages' , values=col_pallet) +  ggtitle(title)
 
 ggsave(output, height=60, width=10, limitsize = FALSE)
@@ -49,8 +57,8 @@ ggtree(y.tree, branch.length = 'none', layout = 'circular') + geom_tippoint(aes(
 
 ggsave(gsub('rectangular', 'circular', output), height=15, width=15)
 
-ggtree(y.tree, layout = 'slanted') + geom_tippoint(aes(color=group), size=1) + scale_color_manual('Passages' , values=col_pallet) + ggtitle(title)
+ggtree(y.tree, layout = 'slanted', branch.length = 'none' ) + geom_tippoint(aes(color=group), size=1) + scale_color_manual('Passages' , values=col_pallet) + ggtitle(title)
 ggsave(gsub('rectangular', 'slanted', output), height=15, width=15)
 
-ggtree(y.tree, layout = 'equal_angle') + geom_tippoint(aes(color=group), size=1) + scale_color_manual('Passages' , values=col_pallet) + ggtitle(title)
+ggtree(y.tree, layout = 'equal_angle', branch.length = 'none') + geom_tippoint(aes(color=group), size=1) + scale_color_manual('Passages' , values=col_pallet) + ggtitle(title)
 ggsave(gsub('rectangular', 'equal_angle', output), height=20, width=20)
