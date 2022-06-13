@@ -38,7 +38,8 @@ scripts_dir = join_path(snakefile_path, 'scripts')
 rule all:
     input:
         rectangular = expand(join_path(results_dir, 'fastani', '{experiment}', '{experiment}.ggtree.ecoli.phages.passages.rectangular.sample_size_' + str(config['sample_size']) +  '.pdf'), experiment=EXPERIMENTS),
-        tsv = expand(join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.phanotate.ORFs.tsv'), experiment=EXPERIMENTS),
+        finished = expand(join_path(results_dir, 'annotations', 'phanotate', '{experiment}', 'finished_phanotate'), experiment=EXPERIMENTS),
+        mmseqs_phrogs_db = join_path('data', 'phrogs_db', 'phrogs_rep_seq.fasta'),
 # MAIN RULE ALL:1 ends here
 
 # [[file:../main.org::*Include][Include:1]]

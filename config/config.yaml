@@ -8,11 +8,11 @@ experiments:
   - 'TREE_6'
 
 sample_genomes: 'true'
-sample_size: 3
+sample_size: 100
 tree_title: ''
 
 mmseqs_phrogs_url:
-  'https://phrogs.lmge.uca.fr/downloads_from_website/phrogs_mmseqs_db.tar.gz'
+  'https://phrogs.lmge.uca.fr/downloads_from_website/FAA_phrog.tar.gz'
 
 data:
   reads: '/export/erikg/data/phage/reads'

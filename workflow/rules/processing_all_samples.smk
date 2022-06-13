@@ -177,45 +177,43 @@ rule orf_prediction_phanotate:
         '>{output.finished} '
 # ORF prediction:1 ends here
 
-# [[file:../../main.org::*Get multi PHROGS][Get multi PHROGS:1]]
-rule annotation_homology_search_phrogs:
+# [[file:../../main.org::*Annotation with prokka][Annotation with prokka:1]]
+rule prokka_annotation:
     input:
-        phanotate_dir = join_path(results_dir, 'annotations', 'phanotate', '{experiment}'),
-        mmseqs_phrogs_db = join_path('data', 'phrogs_mmseqs_db', 'phrogs_profile_db'),
-    output:
-        fna = join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.phanotate.ORFs.fna'),
-        fna_db = join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.phanotate.ORFs.db'),
-        fna_db_clu = join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.phanotate.ORFs.clusterized.db'),
-        fna_db_rep = join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.phanotate.ORFs.rep.db'),
-        compare_db = join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.phanotate.ORFs.compare.db'),
-        tsv = join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.phanotate.ORFs.tsv'),
-    params:
-        tmp = join_path(results_dir, 'annotations', 'mmseqs2', '{experiment}', '{experiment}.tmp'),
-    threads:
-        get_cores_perc(1)
-    conda:
-        '../envs/homology_search.yaml'
-    shell:
-        'find {input.phanotate_dir} -name "*.fasta" | xargs cat > {output.fna} && '
-        'mmseqs createdb {output.fna} {output.fna_db} && '
-        'mmseqs cluster {output.fna_db} {output.fna_db_clu} {params.tmp} --threads {threads} && '
-        'mmseqs createsubdb {output.fna_db_clu} {output.fna_db} {output.fna_db_rep} {params.tmp} && '
-        'mmseqs search {input.mmseqs_phrogs_db} {output.fna_db_rep} {output.compare_db} {params.tmp} -s 7 --threads {threads} && '
-        'mmseqs createtsv {input.mmseqs_phrogs_db} {output.compare_db} {output.tsv} --threads {threads} '
-# Get multi PHROGS:1 ends here
+# Annotation with prokka:1 ends here
 
 # [[file:../../main.org::*Download PHROGS database][Download PHROGS database:1]]
 rule download_phrogs_database:
-    input:
-        mmseqs_phrogs_url = config['mmseqs_phrogs_url'],
     output:
-        mmseqs_phrogs_db = join_path('data', 'phrogs_mmseqs_db', 'phrogs_profile_db')
+        phrogs_tar = join_path('data', 'phrogs_db', 'FAA_phrog.tar.gz'),
     params:
         log_dir = join_path(snakefile_path, '..', 'logs'),
+        mmseqs_phrogs_url = config['mmseqs_phrogs_url'],
     threads:
         1
     shell:
         'exec &> >( tee {params.log_dir}/{rule}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
-        'wget -O "{output.mmseqs_phrogs_db}.tar.gz" {input.mmseqs_phrogs_url} && '
-        'tar -vxf "{output.mmseqs_phrogs_db}.tar.gz" -C "$(dirname {output.mmseqs_phrogs_db} )" '
+        'wget -O {output.phrogs_tar} {params.mmseqs_phrogs_url}'
 # Download PHROGS database:1 ends here
+
+# [[file:../../main.org::*Recluster PHROGS database][Recluster PHROGS database:1]]
+rule reclust_phrogs_database:
+    input:
+        phrogs_tar = join_path('data', 'phrogs_db', 'FAA_phrog.tar.gz'),
+    output:
+        mmseqs_phrogs_db = join_path('data', 'phrogs_db', 'phrogs_rep_seq.fasta'),
+    params:
+        log_dir = join_path(snakefile_path, '..', 'logs'),
+        mmseqs_phrogs_url = config['mmseqs_phrogs_url'],
+        mmseqs_multifasta_dir = join_path('data', 'phrogs_db', 'FAA_phrog'),
+        phrogs_db_dir = join_path('data', 'phrogs_db')
+    threads:
+        get_cores_perc(1)
+    conda:
+        '../envs/mmseqs2_env.yaml'
+    shell:
+        'exec &> >( tee {params.log_dir}/{rule}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
+        'tar -xf {input.phrogs_tar} -C {params.phrogs_db_dir} && '
+        'cat {params.mmseqs_multifasta_dir}/*.faa > {params.phrogs_db_dir}/multifasta.faa && '
+        'mmseqs easy-cluster {params.phrogs_db_dir}/multifasta.faa phrogs tmp --threads {threads}'
+# Recluster PHROGS database:1 ends here
