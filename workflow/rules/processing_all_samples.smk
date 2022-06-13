@@ -215,5 +215,5 @@ rule reclust_phrogs_database:
         'exec &> >( tee {params.log_dir}/{rule}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
         'tar -xf {input.phrogs_tar} -C {params.phrogs_db_dir} && '
         'cat {params.mmseqs_multifasta_dir}/*.faa > {params.phrogs_db_dir}/multifasta.faa && '
-        'mmseqs easy-cluster {params.phrogs_db_dir}/multifasta.faa phrogs tmp --threads {threads}'
+        'mmseqs easy-cluster {params.phrogs_db_dir}/multifasta.faa {params.phrogs_db_dir}/phrogs {params.phrogs_db_dir}/tmp --threads {threads}'
 # Recluster PHROGS database:1 ends here
