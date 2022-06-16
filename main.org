@@ -144,12 +144,12 @@ rule filter_by_lenght_to_get_phage_genomes:
     params:
         ,**config['params']['seqkit'],
     threads:
-        get_cores_perc(0.3)
+        1
     conda:
         '../envs/graphaligner_env.yaml'
     shell:
         'seqkit seq {input.reads} -j {threads} -m {params.min} -M {params.max} | seqkit fq2fa | '
-        "sed -r '/>/ s|>|>{wildcards.sample}#1#|' | bgzip > {output.putative_phage_genomes} "
+        "sed -r '/>/ s|>|>{wildcards.sample}#1#|' > {output.putative_phage_genomes} "
 #+END_SRC
 
 *** Filter genomes
@@ -163,7 +163,7 @@ rule filter_out_bacterial_genomes:
         all_genomes_merged_filtered = join_path(results_dir, 'pggb', 'all_genomes_merged.filter_out_bacteria.fa.gz'),
         ids_to_keep = join_path(results_dir, 'pggb', 'ids_to_keep.txt'),
     params:
-        **config['params']['removing_bacteria'],
+        ,**config['params']['removing_bacteria'],
     threads:
         get_cores_perc(1)
     conda:
@@ -200,7 +200,6 @@ rule sample_genomes:
         'while read f; do grep -P "^${{f}}#" {input.ids_to_keep} | shuf -n {params.sample_size}; done | tee {output.sample_ids} && '
         "samtools faidx {input.all_genomes_merged_filtered} -r {output.sample_ids} | "
         'bgzip -@ {threads} > {output.pggb_input} '
-
 #+END_SRC
 *** Fastani
 #+BEGIN_SRC snakemake
@@ -212,7 +211,7 @@ rule fastaANI_distance_matrix:
         fastani_distance_matrix = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.fastani_distance_matrix.sample_size_' + str(config['sample_size']) + '.tsv'),
         list_of_files = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.list_of_splited_fastas_pahts.sample_size_' + str(config['sample_size']) + '.txt'),
     params:
-        **config['params']['fastani'],
+        ,**config['params']['fastani'],
         log_dir = join_path(str(Path('results').parent.absolute()), 'logs')
     conda:
         '../envs/fastani_env.yaml'
@@ -255,7 +254,7 @@ rule orf_prediction_phanotate:
         phanotate_dir = directory(join_path(results_dir, 'annotations', 'phanotate', '{experiment}')),
         finished = join_path(results_dir, 'annotations', 'phanotate', '{experiment}', 'finished_phanotate'),
     params:
-        **config['params']['phanotate'],
+        ,**config['params']['phanotate'],
         log_dir = join_path(snakefile_path, '..', 'logs'),
     conda:
         '../envs/phanotate_env.yaml'
@@ -311,6 +310,7 @@ rule download_phrogs_database:
 rule reclust_phrogs_database:
     input:
         phrogs_tar = join_path('data', 'phrogs_db', 'FAA_phrog.tar.gz'),
+        format_phrogs_headers = join_path(scripts_dir, 'format_phrogs_headers.py'),
     output:
         mmseqs_phrogs_db = join_path('data', 'phrogs_db', 'phrogs_rep_seq.fasta'),
     params:
@@ -325,7 +325,8 @@ rule reclust_phrogs_database:
     shell:
         'exec &> >( tee {params.log_dir}/{rule}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
         'tar -xf {input.phrogs_tar} -C {params.phrogs_db_dir} && '
-        'cat {params.mmseqs_multifasta_dir}/*.faa > {params.phrogs_db_dir}/multifasta.faa && '
+        'cat {params.mmseqs_multifasta_dir}/*.faa | python3 {input.format_phrogs_headers} '
+        '> {params.phrogs_db_dir}/multifasta.faa && '
         'mmseqs easy-cluster {params.phrogs_db_dir}/multifasta.faa {params.phrogs_db_dir}/phrogs {params.phrogs_db_dir}/tmp --threads {threads}'
 #+END_SRC
 
@@ -419,7 +420,6 @@ rule graphaligner_error_correction:
 :header-args: :tangle config/config.yaml :mkdirp yes :exports none :eval never-export :comments link
 :END:
 #+BEGIN_SRC yaml
-
 experiments:
   - 'TREE_1'
   - 'TREE_2'

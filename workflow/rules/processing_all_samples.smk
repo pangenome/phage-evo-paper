@@ -183,6 +183,7 @@ rule download_phrogs_database:
 rule reclust_phrogs_database:
     input:
         phrogs_tar = join_path('data', 'phrogs_db', 'FAA_phrog.tar.gz'),
+        format_phrogs_headers = join_path(scripts_dir, 'format_phrogs_headers.py'),
     output:
         mmseqs_phrogs_db = join_path('data', 'phrogs_db', 'phrogs_rep_seq.fasta'),
     params:
@@ -197,6 +198,7 @@ rule reclust_phrogs_database:
     shell:
         'exec &> >( tee {params.log_dir}/{rule}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
         'tar -xf {input.phrogs_tar} -C {params.phrogs_db_dir} && '
-        'cat {params.mmseqs_multifasta_dir}/*.faa > {params.phrogs_db_dir}/multifasta.faa && '
+        'cat {params.mmseqs_multifasta_dir}/*.faa | python3 {input.format_phrogs_headers} '
+        '> {params.phrogs_db_dir}/multifasta.faa && '
         'mmseqs easy-cluster {params.phrogs_db_dir}/multifasta.faa {params.phrogs_db_dir}/phrogs {params.phrogs_db_dir}/tmp --threads {threads}'
 # Cluster prokka proteins db (Phrogs):1 ends here
