@@ -12,63 +12,28 @@ rule quality_check_plot:
         "NanoPlot -t {threads} --plots dot --fastq {input.reads} -o {output.plot_dir}"
 # Plot lengths:1 ends here
 
-# [[file:../../main.org::*Assembly][Assembly:1]]
-rule minia_assembly:
+# [[file:../../main.org::*Extract phage genomes][Extract phage genomes:1]]
+rule filter_by_lenght_to_get_phage_genomes:
     input:
         reads = join_path(config['data']['reads'], '{sample}' + config['data']['reads_suffix']),
-        script_abundance = join_path(snakefile_path, 'scripts', 'get_abundance.sh'),
-        script_fa_to_gfa = join_path(snakefile_path, 'scripts', 'convertToGFA.py'),
     output:
-        minia_assembly = join_path(results_dir, 'minia', '{sample}', '{sample}.minia.contigs.fa'),
-        minia_assembly_gfa = join_path(results_dir, 'minia', '{sample}', '{sample}.minia.contigs.gfa'),
-        log_abundance = join_path('logs', '{sample}.abundance.txt'),
+        putative_phage_genomes = join_path(results_dir, 'minia', '{sample}', '{sample}' + '.putative_phage_genomes' + '.fasta'),
     params:
-        **config['params']['minia'],
-    threads:
-        get_cores_perc(0.1)
-    conda:
-        '../envs/minia_env.yaml'
-    shell:
-        "RELATIVE_ABUNDACE=$( {input.script_abundance} {params.P1_abundance} {params.P1_bp} {input.reads} ) && "
-        'echo "{wildcards.sample},${{RELATIVE_ABUNDACE}}" > {output.log_abundance} && '
-        "minia -nb-cores {threads} -kmer-size {params.kmer} -abundance-min $RELATIVE_ABUNDACE "
-        "-out $(echo {output.minia_assembly} | sed 's/.contigs.fa//') -in {input.reads} && "
-        "find $( dirname {output.minia_assembly} ) -type f ! -name '*'$(basename {output.minia_assembly}) -exec rm {{}} \; && "
-        "python {input.script_fa_to_gfa} {output.minia_assembly} {output.minia_assembly_gfa} {params.kmer}"
-# Assembly:1 ends here
-
-# [[file:../../main.org::*Error correction][Error correction:1]]
-rule graphaligner_error_correction:
-    input:
-        reads = join_path(config['data']['reads'], '{sample}' + config['data']['reads_suffix']),
-        minia_assembly_gfa = join_path(results_dir, 'minia', '{sample}', '{sample}.minia.contigs.gfa'),
-    output:
-        putative_phage_genomes = join_path(results_dir, 'minia', '{sample}', '{sample}' + '.putative_phage_genomes' + '.fastq'),
-        putative_phage_genomes_polished = join_path(results_dir, 'minia', '{sample}', '{sample}' + '.putative_phage_genomes' + '.polished' + '.prefixed' + '.fa.gz'),
-    params:
-        gam = join_path(results_dir, 'minia', '{sample}', '{sample}' + '.putative_phage_genomes' + '.polished' + '.gam'),
-        fasta = join_path(results_dir, 'minia', '{sample}', '{sample}' + '.putative_phage_genomes' + '.polished' + '.fa'),
         **config['params']['seqkit'],
-        **config['params']['graphaligner'],
     threads:
         get_cores_perc(0.3)
     conda:
         '../envs/graphaligner_env.yaml'
     shell:
-        "seqkit seq {input.reads} -j {threads} -m {params.min} -M {params.max} > {output.putative_phage_genomes} && "
-        "GraphAligner -g {input.minia_assembly_gfa} -f {output.putative_phage_genomes} -x {params.dbtype} "
-        "--threads {threads} --seeds-minimizer-length {params.seed_minimizer} "
-        "--seeds-minimizer-windowsize {params.seed_minimizer} -a {params.gam} "
-        "--corrected-out {params.fasta} && "
-        "sed -r '/>/ s|>|>{wildcards.sample}#1#|;s|\s.+||' {params.fasta} | bgzip > {output.putative_phage_genomes_polished} && "
-        "rm {params.gam} {params.fasta}"
-# Error correction:1 ends here
+        'seqkit seq {input.reads} -j {threads} -m {params.min} -M {params.max} | seqkit fq2fa | '
+        "sed -r '/>/ s|>|>{wildcards.sample}#1#|' | bgzip > {output.putative_phage_genomes} "
+# Extract phage genomes:1 ends here
 
 # [[file:../../main.org::*Filter genomes][Filter genomes:1]]
 rule filter_out_bacterial_genomes:
     input:
         target = config['data']['genomes']['ecoli_and_phages'],
-        putative_phage_genomes_polished = expand(join_path(results_dir, 'minia', '{sample}', '{sample}' + '.putative_phage_genomes' + '.polished' + '.prefixed' + '.fa.gz'), sample=SAMPLES),
+        putative_phage_genomes = expand(join_path(results_dir, 'minia', '{sample}', '{sample}' + '.putative_phage_genomes' + '.fasta'), sample=SAMPLES),
     output:
         all_genomes_merged = join_path(results_dir, 'pggb', 'all_genomes_merged.fa.gz'),
         all_genomes_merged_filtered = join_path(results_dir, 'pggb', 'all_genomes_merged.filter_out_bacteria.fa.gz'),
@@ -80,7 +45,7 @@ rule filter_out_bacterial_genomes:
     conda:
         '../envs/pggb_env.yaml'
     shell:
-        "zcat {input.putative_phage_genomes_polished} | bgzip -@ {threads} >{output.all_genomes_merged} && "
+        "cat {input.putative_phage_genomes} | bgzip -@ {threads} >{output.all_genomes_merged} && "
         "samtools faidx {output.all_genomes_merged} && "
         "samtools faidx {output.all_genomes_merged} "
         "-r <(wfmash {input.target} {output.all_genomes_merged} -s {params.segment_length} -l {params.block_length} -p {params.map_pct_id} -t {threads} | "
@@ -155,7 +120,7 @@ rule plot_fast_ani:
         'Rscript {input.script_phylogeny_fastani} {output.fastani_distance_matrix_id_fixed} {input.codes} {output.rectangular} {params.title}'
 # Plot FASTANI:1 ends here
 
-# [[file:../../main.org::*ORF prediction][ORF prediction:1]]
+# [[file:../../main.org::*ORF prediction PHANOTATE][ORF prediction PHANOTATE:1]]
 rule orf_prediction_phanotate:
     input:
         list_of_files = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.list_of_splited_fastas_pahts.sample_size_' + str(config['sample_size']) + '.txt'),
@@ -175,14 +140,32 @@ rule orf_prediction_phanotate:
         'python3 {input.phanotate_runner} --input_file_list {input.list_of_files} '
         ' --threads {threads} --out_format {params.out_format} --output_dir {output.phanotate_dir} && '
         '>{output.finished} '
-# ORF prediction:1 ends here
+# ORF prediction PHANOTATE:1 ends here
 
-# [[file:../../main.org::*Annotation with prokka][Annotation with prokka:1]]
-rule prokka_annotation:
+# [[file:../../main.org::*PROKKA annotation][PROKKA annotation:1]]
+rule annotation_prokka:
     input:
-# Annotation with prokka:1 ends here
+        list_of_files = join_path(results_dir, 'fastani', '{experiment}', '{experiment}.list_of_splited_fastas_pahts.sample_size_' + str(config['sample_size']) + '.txt'),
+        mmseqs_phrogs_db = join_path('data', 'phrogs_db', 'phrogs_rep_seq.fasta'),
+        prokka_runner = join_path(scripts_dir, 'prokka_runner.py'),
+    output:
+        prokka_dir = directory(join_path(results_dir, 'annotations', 'prokka', '{experiment}')),
+        finished = join_path(results_dir, 'annotations', 'prokka', '{experiment}', 'finished_prokka'),
+    params:
+        log_dir = join_path(snakefile_path, '..', 'logs'),
+    conda:
+        '../envs/prokka_env.yaml'
+    threads:
+        get_cores_perc(1)
+    shell:
+        'exec &> >( tee {params.log_dir}/{rule}_{wildcards.experiment}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
+        'python3 {input.prokka_runner} --input_file_list {input.list_of_files} '
+        '--output_dir {output.prokka_dir} --proteins {input.mmseqs_phrogs_db} '
+        '--threads {threads} --prokka_threads 4 && '
+        'touch {output.finished}'
+# PROKKA annotation:1 ends here
 
-# [[file:../../main.org::*Download PHROGS database][Download PHROGS database:1]]
+# [[file:../../main.org::*Download prokka proteins db (Phrogs)][Download prokka proteins db (Phrogs):1]]
 rule download_phrogs_database:
     output:
         phrogs_tar = join_path('data', 'phrogs_db', 'FAA_phrog.tar.gz'),
@@ -194,9 +177,9 @@ rule download_phrogs_database:
     shell:
         'exec &> >( tee {params.log_dir}/{rule}_$(date +%Y_%m_%d_-_%H_%M_%S).log ) && '
         'wget -O {output.phrogs_tar} {params.mmseqs_phrogs_url}'
-# Download PHROGS database:1 ends here
+# Download prokka proteins db (Phrogs):1 ends here
 
-# [[file:../../main.org::*Recluster PHROGS database][Recluster PHROGS database:1]]
+# [[file:../../main.org::*Cluster prokka proteins db (Phrogs)][Cluster prokka proteins db (Phrogs):1]]
 rule reclust_phrogs_database:
     input:
         phrogs_tar = join_path('data', 'phrogs_db', 'FAA_phrog.tar.gz'),
@@ -216,4 +199,4 @@ rule reclust_phrogs_database:
         'tar -xf {input.phrogs_tar} -C {params.phrogs_db_dir} && '
         'cat {params.mmseqs_multifasta_dir}/*.faa > {params.phrogs_db_dir}/multifasta.faa && '
         'mmseqs easy-cluster {params.phrogs_db_dir}/multifasta.faa {params.phrogs_db_dir}/phrogs {params.phrogs_db_dir}/tmp --threads {threads}'
-# Recluster PHROGS database:1 ends here
+# Cluster prokka proteins db (Phrogs):1 ends here
