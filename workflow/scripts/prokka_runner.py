@@ -81,7 +81,7 @@ def main(*args, **kwargs):
         input_files = f.read().splitlines()
 
 
-    parallel_processes = max(1, kwargs['--threads']/kwargs['--prokka_threads'])
+    parallel_processes = max(1, int(kwargs['--threads']/kwargs['--prokka_threads']))
 
     # Running prokka
     logger.info("Running {} parallel processes with {} threads each".format(parallel_processes, kwargs['--prokka_threads']))

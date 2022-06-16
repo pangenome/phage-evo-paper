@@ -21,12 +21,12 @@ rule filter_by_lenght_to_get_phage_genomes:
     params:
         **config['params']['seqkit'],
     threads:
-        get_cores_perc(0.3)
+        1
     conda:
         '../envs/graphaligner_env.yaml'
     shell:
         'seqkit seq {input.reads} -j {threads} -m {params.min} -M {params.max} | seqkit fq2fa | '
-        "sed -r '/>/ s|>|>{wildcards.sample}#1#|' | bgzip > {output.putative_phage_genomes} "
+        "sed -r '/>/ s|>|>{wildcards.sample}#1#|' > {output.putative_phage_genomes} "
 # Extract phage genomes:1 ends here
 
 # [[file:../../main.org::*Filter genomes][Filter genomes:1]]
