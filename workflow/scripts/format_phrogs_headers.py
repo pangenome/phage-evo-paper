@@ -14,7 +14,7 @@ def main(separator=' !! '):
                 product = 'Unknown'
                 if len(header_info) == 7:
                     product = header_info[3]
-                line = f'>{idx}: {product}'
+                line = '>{}: {}'.format(idx, product)
             print(line)
     except BrokenPipeError:
         pass
