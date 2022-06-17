@@ -202,3 +202,20 @@ rule reclust_phrogs_database:
         '> {params.phrogs_db_dir}/multifasta.faa && '
         'mmseqs easy-cluster {params.phrogs_db_dir}/multifasta.faa {params.phrogs_db_dir}/phrogs {params.phrogs_db_dir}/tmp --threads {threads}'
 # Cluster prokka proteins db (Phrogs):1 ends here
+
+# [[file:../../main.org::*Panaroo get cluster of homologous][Panaroo get cluster of homologous:1]]
+rule get_homologous_genes:
+    input:
+        prokka_dir = join_path(results_dir, 'annotations', 'prokka', '{experiment}'),
+        finished = join_path(results_dir, 'annotations', 'prokka', '{experiment}', 'finished_prokka'),
+    output:
+        list_of_gff_files = join_path(results_dir, 'annotations', 'prokka', '{experiment}', 'list_of_gff_files.txt' ),
+        panaroo_dir = directory(join_path(results_dir, 'annotations', 'panaroo', '{experiment}', 'panaroo_sample_size_' + str(config['sample_size']))),
+    threads:
+        get_cores_perc(1)
+    conda:
+        '../envs/panaroo_env.yaml'
+    shell:
+        'find {input.prokka_dir} -name "*.gff" -exec readlink -f {{}} \; > {output.list_of_gff_files} && '
+        'panaroo -i {output.list_of_gff_files} -o {output.panaroo_dir} --clean-mode strict --threads {threads} '
+# Panaroo get cluster of homologous:1 ends here

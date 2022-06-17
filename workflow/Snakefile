@@ -39,7 +39,8 @@ rule all:
     input:
         rectangular = expand(join_path(results_dir, 'fastani', '{experiment}', '{experiment}.ggtree.ecoli.phages.passages.rectangular.sample_size_' + str(config['sample_size']) +  '.pdf'), experiment=EXPERIMENTS),
         phanotate_finished = expand(join_path(results_dir, 'annotations', 'phanotate', '{experiment}', 'finished_phanotate'), experiment=EXPERIMENTS),
-        prokka_finished = expand(join_path(results_dir, 'annotations', 'prokka', '{experiment}', 'finished_prokka'), experiment=EXPERIMENTS)
+        prokka_finished = expand(join_path(results_dir, 'annotations', 'prokka', '{experiment}', 'finished_prokka'), experiment=EXPERIMENTS),
+        panaroo_dir = expand(join_path(results_dir, 'annotations', 'panaroo', '{experiment}', 'panaroo_sample_size_' + str(config['sample_size'])), experiment=EXPERIMENTS),
 # MAIN RULE ALL:1 ends here
 
 # [[file:../main.org::*Include][Include:1]]
