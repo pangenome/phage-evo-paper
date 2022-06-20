@@ -8,7 +8,7 @@ experiments:
   - 'TREE_6'
 
 sample_genomes: 'true'
-sample_size: 50
+sample_size: 3
 tree_title: ''
 
 mmseqs_phrogs_url:
@@ -45,7 +45,7 @@ params:
     keep_percent: 90
     min_length: 10_000
   pggb:
-    map_pct_id: 95
+    map_pct_id: 80
     segment_length: 500
     block_length: 1_000
     min_match_len: 47

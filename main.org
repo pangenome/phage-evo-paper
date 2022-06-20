@@ -107,6 +107,7 @@ rule all:
         phanotate_finished = expand(join_path(results_dir, 'annotations', 'phanotate', '{experiment}', 'finished_phanotate'), experiment=EXPERIMENTS),
         prokka_finished = expand(join_path(results_dir, 'annotations', 'prokka', '{experiment}', 'finished_prokka'), experiment=EXPERIMENTS),
         panaroo_dir = expand(join_path(results_dir, 'annotations', 'panaroo', '{experiment}', 'panaroo_sample_size_' + str(config['sample_size'])), experiment=EXPERIMENTS),
+        pggb_out = expand(join_path(results_dir, 'pggb', '{experiment}', 'sample_' + str(config['sample_size'])), experiment=EXPERIMENTS),
 #+END_SRC
 
 ** Include
@@ -349,15 +350,13 @@ rule get_homologous_genes:
         'panaroo -i {output.list_of_gff_files} -o {output.panaroo_dir} --clean-mode strict --threads {threads} '
 #+END_SRC
 
-
-** saving some unused rules
 *** PGGB
 #+BEGIN_SRC snakemake
 rule pggb_pangenome:
     input:
-        pggb_input = join_path(results_dir, 'pggb', 'genomes.sample_' + str(config['sample_size']) + '_from_each_passage.fa.gz')
+        pggb_input = join_path(results_dir, 'pggb', '{experiment}', '{experiment}.merged_genomes.sample_size_' + str(config['sample_size']) + '.fa.gz'),
     output:
-        pggb_out = directory(join_path(results_dir, 'pggb', 'sample_' + str(config['sample_size']) ))
+        pggb_out = directory(join_path(results_dir, 'pggb', '{experiment}', 'sample_' + str(config['sample_size']) ))
     params:
         ,**config['params']['pggb']
     threads:
@@ -368,6 +367,8 @@ rule pggb_pangenome:
         "n_mappings=$( zgrep -c '>' {input.pggb_input} ) && "
         "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -k {params.min_match_len} -B {params.transclose_batch} -t {threads} -o {output.pggb_out} -i {input.pggb_input}"
 #+END_SRC
+
+** saving some unused rules
 *** odgi distance matrix
 #+BEGIN_SRC snakemake
 rule get_distance_metrics:
@@ -486,7 +487,7 @@ params:
     keep_percent: 90
     min_length: 10_000
   pggb:
-    map_pct_id: 95
+    map_pct_id: 80
     segment_length: 500
     block_length: 1_000
     min_match_len: 47

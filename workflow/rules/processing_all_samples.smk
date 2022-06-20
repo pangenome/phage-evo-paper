@@ -219,3 +219,20 @@ rule get_homologous_genes:
         'find {input.prokka_dir} -name "*.gff" -exec readlink -f {{}} \; > {output.list_of_gff_files} && '
         'panaroo -i {output.list_of_gff_files} -o {output.panaroo_dir} --clean-mode strict --threads {threads} '
 # Panaroo get cluster of homologous:1 ends here
+
+# [[file:../../main.org::*PGGB][PGGB:1]]
+rule pggb_pangenome:
+    input:
+        pggb_input = join_path(results_dir, 'pggb', '{experiment}', '{experiment}.merged_genomes.sample_size_' + str(config['sample_size']) + '.fa.gz'),
+    output:
+        pggb_out = directory(join_path(results_dir, 'pggb', '{experiment}', 'sample_' + str(config['sample_size']) ))
+    params:
+        **config['params']['pggb']
+    threads:
+        get_cores_perc(1)
+    conda:
+        '../envs/pggb_env.yaml'
+    shell:
+        "n_mappings=$( zgrep -c '>' {input.pggb_input} ) && "
+        "pggb -m -p {params.map_pct_id} -n $n_mappings -s {params.segment_length} -l {params.block_length} -k {params.min_match_len} -B {params.transclose_batch} -t {threads} -o {output.pggb_out} -i {input.pggb_input}"
+# PGGB:1 ends here
